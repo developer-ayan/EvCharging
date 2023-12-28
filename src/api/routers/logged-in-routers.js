@@ -59,7 +59,7 @@ router.post("/dashboard_stations", upload, async (req, res) => {
         const { latitude, longitude } = req.body;
 
         if (!latitude || !longitude) {
-            return res.status(400).json({ status: false, message: 'latitude and longitude are required' });
+            return res.status(200).json({ status: false, message: 'latitude and longitude are required' });
         }
 
         const nearbyStations = await Station.find({
@@ -77,7 +77,7 @@ router.post("/dashboard_stations", upload, async (req, res) => {
     } catch (error) {
         console.log('error', error);
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 

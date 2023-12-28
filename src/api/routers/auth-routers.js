@@ -25,24 +25,27 @@ router.post("/register", upload, async (req, res) => {
         const { name, phone, bike_mode, email } = req.body;
 
         if (!name || !phone || !bike_mode) {
-            return res.status(400).json({ status: false, message: 'All fields are required' });
+            return res.status(200).json({ status: false, message: 'All fields are required' });
         }
 
-        if (await Users.findOne({ phone })) {
+        const existingPhoneUser = await Users.findOne({ phone });
+        const existingEmailUser = await Users.findOne({ email });
+
+        if (existingPhoneUser) {
             return res.status(200).json({ status: false, message: 'Phone number already exists' });
-        } else if (await Users.findOne({ email })) {
+        } else if (existingEmailUser) {
             return res.status(200).json({ status: false, message: 'Email already exists' });
         }
 
-
         const user = await Users.create({ name, phone, bike_mode, email });
-        const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-        res.status(201).json({ status: true, data: user, token, message: 'User registered successfully' });
+        // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
+        res.status(201).json({ status: true, data: user,  message: 'User registered successfully' });
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        console.error(error);
+        res.status(200).json({ status: false, message: error.message });
     }
 });
+
 
 
 router.post("/login", upload, async (req, res) => {
@@ -55,10 +58,9 @@ router.post("/login", upload, async (req, res) => {
             return res.status(401).json({ status: false, message: 'User not found' });
         }
 
-        const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-        res.status(200).json({ status: true, data: user, token, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+        // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
+        res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
     } catch (error) {
-        console.error('Error during login:', error);
         res.status(500).json({ status: false, message: 'Internal Server Error' });
     }
 });
@@ -91,8 +93,7 @@ router.post("/registration_otp_verfication", upload, async (req, res) => {
             return res.status(200).json({ status: true, data: { OTP: randomFourDigitNumber }, message: 'We have sent an OTP to your number.' });
         }
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -101,11 +102,11 @@ router.post("/edit_profile", AuthMiddleware, upload_single, async (req, res) => 
 
         const { _id, name, bike_mode, profile_image, phone } = req.body;
         if (!_id) {
-            return res.status(404).json({ status: false, message: '_id is required' });
+            return res.status(200).json({ status: false, message: '_id is required' });
         }
         const user = await Users.findOne({ _id });
         if (!user) {
-            return res.status(404).json({ status: false, message: 'User not found' });
+            return res.status(200).json({ status: false, message: 'User not found' });
         }
 
         user.name = name || user.name;
@@ -122,7 +123,7 @@ router.post("/edit_profile", AuthMiddleware, upload_single, async (req, res) => 
 
     } catch (error) {
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 

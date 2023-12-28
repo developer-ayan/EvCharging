@@ -12,14 +12,14 @@ router.post("/create_station", upload, async (req, res) => {
         const { station_name, unit_price, latitude, longitude, location } = req.body;
 
         if (!station_name || !unit_price || !latitude, !longitude, !location) {
-            return res.status(400).json({ status: false, message: 'All fields are required' });
+            return res.status(200).json({ status: false, message: 'All fields are required' });
         }
 
         await Station.create({ station_name, unit_price, latitude, longitude, location });
         res.status(201).json({ status: true, message: 'Station created successfully' });
     } catch (error) {
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -47,7 +47,7 @@ router.post("/edit_station", upload, async (req, res) => {
 
     } catch (error) {
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -82,7 +82,7 @@ router.post("/station_detail", upload, async (req, res) => {
     } catch (error) {
         console.log('error', error)
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -100,13 +100,13 @@ router.post("/create_station_port", upload, async (req, res) => {
     try {
         const { station_id, port_type, slots } = req.body;
         if (!station_id || !port_type || !slots) {
-            return res.status(400).json({ status: false, message: 'All fields are required' });
+            return res.status(200).json({ status: false, message: 'All fields are required' });
         }
         await Port.create({ station_id, port_type, slots });
         res.status(201).json({ status: true, message: 'Port created successfully' });
     } catch (error) {
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -131,7 +131,7 @@ router.post("/edit_station_port", upload, async (req, res) => {
 
     } catch (error) {
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -162,7 +162,7 @@ router.post("/station_port_detail", upload, async (req, res) => {
     } catch (error) {
         console.log('error', error);
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
@@ -198,7 +198,7 @@ router.post("/station_port_list", upload, async (req, res) => {
     } catch (error) {
         console.log('error', error)
         const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(status).json({ status: false, message: error.message });
+        res.status(200).json({ status: false, message: error.message });
     }
 });
 
