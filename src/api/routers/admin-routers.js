@@ -5,6 +5,7 @@ const upload = multer().none();
 const { MongoClient } = require('mongodb')
 const { BASE_URL, DATA_BASE } = require('../../utils/urls')
 const Station = require('../models/admin/create-station')
+const AdminUsers = require('../models/admin/admin-users')
 const Port = require('../models/admin/create-port')
 
 router.post("/create_station", upload, async (req, res) => {
@@ -22,6 +23,34 @@ router.post("/create_station", upload, async (req, res) => {
         res.status(200).json({ status: false, message: error.message });
     }
 });
+
+
+router.post("/login", upload, async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ status: false, message: 'All fields are required' });
+        }
+
+        // Use findOne with a query object specifying both email and password
+        const user = await AdminUsers.findOne({ email, password });
+
+        console.log('user', user);
+
+        if (!user) {
+            return res.status(200).json({ status: false, message: 'Invalid email or password' });
+        }
+
+        res.status(200).json({ status: true, data: user, message: 'Login successful' });
+    } catch (error) {
+        console.error('error', error);
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(500).json({ status: false, message: 'Internal server error' });
+    }
+});
+
+
 
 router.post("/edit_station", upload, async (req, res) => {
     try {
