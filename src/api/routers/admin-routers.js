@@ -76,7 +76,7 @@ router.post("/station_detail", upload, async (req, res) => {
         }
         const station = await Station.findOne({ _id });
         if (!station) {
-            return res.status(401).json({ status: false, message: 'Station not found' });
+            return res.status(200).json({ status: false, message: 'Station not found' });
         }
         res.status(200).json({ status: true, data: station, message: 'Station fetch successfully.' });
     } catch (error) {
@@ -144,12 +144,12 @@ router.post("/station_port_detail", upload, async (req, res) => {
 
         const port = await Port.findOne({ _id });
         if (!port) {
-            return res.status(401).json({ status: false, message: 'Port not found' });
+            return res.status(200).json({ status: false, message: 'Port not found' });
         }
 
         const station = await Station.findOne({ _id: port?.station_id });
         if (!station) {
-            return res.status(401).json({ status: false, message: 'Station not found' });
+            return res.status(200).json({ status: false, message: 'Station not found' });
         }
 
         // Use the spread operator to merge properties
@@ -176,12 +176,12 @@ router.post("/station_port_list", upload, async (req, res) => {
 
         const port = await Port.find({ station_id }).sort({ _id: -1 }).exec();
         if (!port) {
-            return res.status(401).json({ status: false, message: 'Ports not found' });
+            return res.status(200).json({ status: false, message: 'Ports not found' });
         }
 
         const station = await Station.findOne({ _id: port?.[0]?.station_id });
         if (!station) {
-            return res.status(401).json({ status: false, message: 'Station not found' });
+            return res.status(200).json({ status: false, message: 'Station not found' });
         } else {
 
             const modified_array = port?.map((item, index) => {

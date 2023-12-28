@@ -55,7 +55,7 @@ router.post("/login", upload, async (req, res) => {
         const user = await Users.findOne({ phone });
 
         if (!user) {
-            return res.status(401).json({ status: false, message: 'User not found' });
+            return res.status(200).json({ status: false, message: 'User not found' });
         }
 
         // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
@@ -73,7 +73,7 @@ router.post("/fetch_profile", upload, async (req, res) => {
         }
         const user = await Users.findOne({ _id });
         if (!user) {
-            return res.status(401).json({ status: false, message: 'User not found' });
+            return res.status(200).json({ status: false, message: 'User not found' });
         }
         res.status(200).json({ status: true, data: user, message: 'Profile fetch successfully.' });
     } catch (error) {
