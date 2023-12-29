@@ -29,22 +29,22 @@ router.post("/dashboard_stations", upload, async (req, res) => {
 
         if (!latitude || !longitude) {
             return res.status(200).json({ status: false, message: 'latitude and longitude are required' });
+        }else{
+            const radius = await StationradiusUsers.find({  });
+            const set_radius = radius?.length > 0 ? parseFloat(radius?.[0]?.toObject()?.radius)  :  10
+            const nearbyStations = await Station.find({
+                latitude: {
+                    $gt: parseFloat(latitude) - (set_radius / 111), // Latitude range
+                    $lt: parseFloat(latitude) + (set_radius / 111),
+                },
+                longitude: {
+                    $gt: parseFloat(longitude) - (set_radius / (111 * Math.cos(parseFloat(latitude) * Math.PI / 180))), // Longitude range
+                    $lt: parseFloat(longitude) + (set_radius / (111 * Math.cos(parseFloat(latitude) * Math.PI / 180))),
+                },
+            });
+    
+            res.status(200).json({ status: true, data: nearbyStations, message: 'Stations fetch successfully.' });
         }
-
-        const radius = await StationradiusUsers.find({  });
-        const set_radius = radius?.length > 0 ? parseFloat(radius?.[0]?.toObject()?.radius)  :  10
-        const nearbyStations = await Station.find({
-            latitude: {
-                $gt: parseFloat(latitude) - (set_radius / 111), // Latitude range
-                $lt: parseFloat(latitude) + (set_radius / 111),
-            },
-            longitude: {
-                $gt: parseFloat(longitude) - (set_radius / (111 * Math.cos(parseFloat(latitude) * Math.PI / 180))), // Longitude range
-                $lt: parseFloat(longitude) + (set_radius / (111 * Math.cos(parseFloat(latitude) * Math.PI / 180))),
-            },
-        });
-
-        res.status(200).json({ status: true, data: nearbyStations, message: 'Stations fetch successfully.' });
     } catch (error) {
         console.log('error', error);
         const status = error.name === 'ValidationError' ? 400 : 500;

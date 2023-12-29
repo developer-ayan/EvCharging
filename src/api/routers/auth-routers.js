@@ -35,11 +35,11 @@ router.post("/register", upload, async (req, res) => {
             return res.status(200).json({ status: false, message: 'Phone number already exists' });
         } else if (existingEmailUser) {
             return res.status(200).json({ status: false, message: 'Email already exists' });
+        }else{
+            const user = await Users.create({ name, phone, bike_mode, email });
+            // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
+            res.status(201).json({ status: true, data: user,  message: 'User registered successfully' });
         }
-
-        const user = await Users.create({ name, phone, bike_mode, email });
-        // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-        res.status(201).json({ status: true, data: user,  message: 'User registered successfully' });
     } catch (error) {
         console.error(error);
         res.status(200).json({ status: false, message: error.message });
@@ -56,10 +56,9 @@ router.post("/login", upload, async (req, res) => {
 
         if (!user) {
             return res.status(200).json({ status: false, message: 'User not found' });
+        }else{
+            res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
         }
-
-        // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-        res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
     } catch (error) {
         res.status(500).json({ status: false, message: 'Internal Server Error' });
     }
@@ -70,12 +69,15 @@ router.post("/fetch_profile", upload, async (req, res) => {
         const { _id } = req.body;
         if (!_id) {
             return res.status(404).json({ status: false, message: '_id is required' });
+        }else{
+            const user = await Users.findOne({ _id });
+            if (!user) {
+                return res.status(200).json({ status: false, message: 'User not found' });
+            }else{
+                res.status(200).json({ status: true, data: user, message: 'Profile fetch successfully.' });
+            }
         }
-        const user = await Users.findOne({ _id });
-        if (!user) {
-            return res.status(200).json({ status: false, message: 'User not found' });
-        }
-        res.status(200).json({ status: true, data: user, message: 'Profile fetch successfully.' });
+        
     } catch (error) {
         res.status(500).json({ status: false, message: 'Internal Server Error' });
     }
@@ -107,19 +109,21 @@ router.post("/edit_profile", AuthMiddleware, upload_single, async (req, res) => 
         const user = await Users.findOne({ _id });
         if (!user) {
             return res.status(200).json({ status: false, message: 'User not found' });
+        }else{
+
+            user.name = name || user.name;
+            user.bike_mode = bike_mode || user.bike_mode;
+            user.phone = phone || user.phone;
+    
+            if (req.file) {
+                user.profile_image = req.file.filename;
+            }
+    
+            const updatedUser = await user.save();
+    
+            res.status(200).json({ status: true, data: updatedUser, message: 'Profile updated successfully' });
         }
 
-        user.name = name || user.name;
-        user.bike_mode = bike_mode || user.bike_mode;
-        user.phone = phone || user.phone;
-
-        if (req.file) {
-            user.profile_image = req.file.filename;
-        }
-
-        const updatedUser = await user.save();
-
-        res.status(200).json({ status: true, data: updatedUser, message: 'Profile updated successfully' });
 
     } catch (error) {
         const status = error.name === 'ValidationError' ? 400 : 500;
