@@ -18,7 +18,6 @@ router.get('/vehicle_category', async (req, res) => {
 
         res.json({ status: true, data: allVehicleCategories || [], message: 'These are all the categories.' });
     } catch (error) {
-        console.error('Error getting all vehicle categories:', error);
         res.status(500).json({ status: false, message: 'categories are not available' });
     }
 });
@@ -46,8 +45,7 @@ router.post("/dashboard_stations", upload, async (req, res) => {
             res.status(200).json({ status: true, data: nearbyStations, message: 'Stations fetch successfully.' });
         }
     } catch (error) {
-        console.log('error', error);
-        const status = error.name === 'ValidationError' ? 400 : 500;
+        const status = error.name === 'ValidationError' ? 400 : 1;
         res.status(200).json({ status: false, message: error.message });
     }
 });

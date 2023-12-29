@@ -22,9 +22,9 @@ const upload_single = multer({ storage }).single('profile_image');
 
 router.post("/register", upload, async (req, res) => {
     try {
-        const { name, phone, bike_mode, email } = req.body;
+        const { name, phone, email , social_id } = req.body;
 
-        if (!name || !phone || !bike_mode) {
+        if (!name || !phone) {
             return res.status(200).json({ status: false, message: 'All fields are required' });
         }
 
@@ -36,9 +36,9 @@ router.post("/register", upload, async (req, res) => {
         } else if (existingEmailUser) {
             return res.status(200).json({ status: false, message: 'Email already exists' });
         }else{
-            const user = await Users.create({ name, phone, bike_mode, email });
+            const user = await Users.create({ name, phone, email });
             // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-            res.status(201).json({ status: true, data: user,  message: 'User registered successfully' });
+            res.status(200).json({ status: true, data: user,  message: 'User registered successfully' });
         }
     } catch (error) {
         console.error(error);
@@ -46,7 +46,45 @@ router.post("/register", upload, async (req, res) => {
     }
 });
 
+router.post("/register_social_account", upload, async (req, res) => {
+    try {
+        const { social_id , name , phone, email } = req.body;
 
+        if (!social_id) {
+            return res.status(200).json({ status: false, message: 'social_id is required' });
+        }else{
+            const user = await Users.findOne({ social_id });
+
+            if (user) {
+                return res.status(200).json({ status: false, message: 'This account already registered.' });
+            }else{
+                const user = await Users.create({ name , phone, email , social_id });
+                return res.status(200).json({ status: true, data : user, message: 'User registered successfully' });
+            }
+        }
+    } catch (error) {
+        res.status(500).json({ status: false, message: 'Internal Server Error' });
+    }
+});
+
+router.post("/social_login", upload, async (req, res) => {
+    try {
+        const { social_id , name , phone, email } = req.body;
+
+        if (!social_id) {
+            return res.status(200).json({ status: false, message: 'social_id is required' });
+        }else{
+            const user = await Users.findOne({ social_id });
+            if (user) {
+                return res.status(200).json({ status: true, data : user, message: 'Login successfully.' });
+            }else{
+                res.status(200).json({ status: false, message: 'User not found!' });
+            }
+        }
+    } catch (error) {
+        res.status(500).json({ status: false, message: 'Internal Server Error' });
+    }
+});
 
 router.post("/login", upload, async (req, res) => {
     try {
