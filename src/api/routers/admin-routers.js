@@ -3,6 +3,8 @@ const multer = require('multer')
 const router = express.Router();
 const upload = multer().none();
 const path = require('path');
+const fs = require('fs');
+
 const {
     MongoClient
 } = require('mongodb')
@@ -14,56 +16,34 @@ const Station = require('../models/admin/create-station')
 const AdminUsers = require('../models/admin/admin-users')
 const StationradiusUsers = require('../models/admin/station-radius')
 const Port = require('../models/admin/create-port')
+const Rating = require('../models/logged-in/station-rating')
 const AuthMiddleware = require('../middlewares/authMiddleware');
 
+// Destination folder
+const destinationFolder = './uploads/station_images/';
+
+// Create the destination folder if it doesn't exist
+if (!fs.existsSync(destinationFolder)) {
+  fs.mkdirSync(destinationFolder, { recursive: true });
+}
+
+// Set storage engine
 const storage = multer.diskStorage({
-    destination: function(req, file, cb) {
-        cb(null, './uploads/'); // Specify the destination folder
-    },
-    filename: function(req, file, cb) {
-        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-    }
+  destination: function (req, file, cb) {
+    cb(null, destinationFolder);
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
 });
+
 const upload_single = multer({
     storage
 }).single('profile_image');
 
-router.post("/create_station", upload, async (req, res) => {
-    try {
-        const {
-            station_name,
-            unit_price,
-            latitude,
-            longitude,
-            location
-        } = req.body;
-
-        if (!station_name || !unit_price || !latitude, !longitude, !location) {
-            return res.status(200).json({
-                status: false,
-                message: 'All fields are required'
-            });
-        }
-
-        await Station.create({
-            station_name,
-            unit_price,
-            latitude,
-            longitude,
-            location
-        });
-        res.status(201).json({
-            status: true,
-            message: 'Station created successfully'
-        });
-    } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(200).json({
-            status: false,
-            message: error.message
-        });
-    }
-});
+const upload_single_station = multer({
+    storage
+}).single('station_image');
 
 
 router.post("/login", upload, async (req, res) => {
@@ -111,8 +91,53 @@ router.post("/login", upload, async (req, res) => {
 });
 
 
+router.post("/create_station", upload_single_station, async (req, res) => {
+    try {
+        const {
+            station_name,
+            unit_price,
+            latitude,
+            longitude,
+            location
+        } = req.body;
 
-router.post("/edit_station", upload, async (req, res) => {
+        if (!station_name || !unit_price || !latitude, !longitude, !location) {
+            return res.status(200).json({
+                status: false,
+                message: 'All fields are required'
+            });
+        }
+
+
+
+        await Station.create({
+            station_name,
+            unit_price,
+            latitude,
+            longitude,
+            location: {
+                type: 'Point',
+                coordinates: [parseFloat(longitude), parseFloat(latitude)],
+                name: location
+            },
+            station_image: req.file ? req.file.filename : null,
+        });
+
+        res.status(201).json({
+            status: true,
+            message: 'Station created successfully'
+        });
+    } catch (error) {
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+});
+
+
+router.post("/edit_station", upload_single_station, async (req, res) => {
     try {
 
         const {
@@ -124,7 +149,7 @@ router.post("/edit_station", upload, async (req, res) => {
             location
         } = req.body;
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: '_id is required'
             });
@@ -133,7 +158,7 @@ router.post("/edit_station", upload, async (req, res) => {
             _id
         });
         if (!station) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: 'Station not found'
             });
@@ -141,9 +166,12 @@ router.post("/edit_station", upload, async (req, res) => {
 
         station.station_name = station_name || station.station_name;
         station.unit_price = unit_price || station.unit_price;
-        station.latitude = latitude || station.latitude;
-        station.longitude = longitude || station.longitude;
-        station.location = location || station.location;
+        station.location.coordinates = [parseFloat(longitude), parseFloat(latitude)] || station.location.coordinates;
+        station.location.name = location || station.location.name;
+
+        if (req.file) {
+            station.station_image = req.file.filename;
+        }
 
         const updatedStation = await station.save();
 
@@ -227,7 +255,7 @@ router.post("/station_detail", upload, async (req, res) => {
 
 router.get("/station_list", async (req, res) => {
     try {
-        const stations = await Station.find({});
+        const stations = await Station.find({}).sort({ _id: -1 }).exec()
         res.status(200).json({
             status: true,
             data: stations,
@@ -512,8 +540,8 @@ router.post("/registration_otp_verfication", upload, async (req, res) => {
                 message: 'Email is required'
             });
         } else if (await AdminUsers.findOne({
-                email
-            })) {
+            email
+        })) {
             return res.status(200).json({
                 status: false,
                 message: 'Email already exists'
@@ -631,7 +659,7 @@ router.post("/create_station_radius", upload, async (req, res) => {
             });
         }
 
-        const stationRadius = await StationradiusUsers.find({});
+        const stationRadius = await StationradiusUsers.find({}).sort({ _id: -1 }).exec()
 
         if (stationRadius.length > 0) {
             return res.status(200).json({
@@ -700,7 +728,7 @@ router.post("/edit_station_radius", AuthMiddleware, upload_single, async (req, r
 router.post("/fetch_radius", upload, async (req, res) => {
     try {
 
-        const radius = await StationradiusUsers.find({});
+        const radius = await StationradiusUsers.find({}).sort({ _id: -1 }).exec()
         if (!radius) {
             return res.status(200).json({
                 status: false,
@@ -717,6 +745,25 @@ router.post("/fetch_radius", upload, async (req, res) => {
             status: false,
             message: 'Internal Server Error'
         });
+    }
+});
+
+router.post("/station_reviews", upload, async (req, res) => {
+    try {
+        const { station_id } = req.body;
+        if (!station_id) {
+            return res.status(200).json({ status: true, data: [], message: 'station_id is required' });
+        } else {
+            const stationRating = await Rating.find({ station_id }).sort({ _id: -1 }).exec()
+            if (stationRating) {
+                return res.status(200).json({ status: true, data: stationRating, message: 'Reviews fetch successfully.' });
+            } else {
+                return res.status(200).json({ status: false, data: [], message: 'Reviews not found!' });
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ status: false, data: [], message: 'Internal Server Error' });
     }
 });
 

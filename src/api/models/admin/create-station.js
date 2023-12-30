@@ -12,14 +12,24 @@ const stationSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
-    latitude: {
-        type: String,
-        required: true,
-        trim: true,
+    location: {
+        type: {
+            type: String,
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number],
+            default: [0, 0]
+        },
+        name: {
+            type: String,
+            required: true,
+            trim: true
+        }
     },
-    longitude: {
+    station_image: {
         type: String,
-        required: true,
+        default: null, // Set the default value here
         trim: true,
     },
     serial_no: {
@@ -36,6 +46,8 @@ function generateCustomSerialNumber() {
 
     return serialNumber;
 }
+
+stationSchema.index({ location: '2dsphere' });
 
 const Stations = mongoose.model('station', stationSchema);
 

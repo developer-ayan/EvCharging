@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const Users = require('../models/auth/users');
 const AuthMiddleware = require('../middlewares/authMiddleware');
@@ -9,15 +10,24 @@ const tokenSecretKey = process.env.TOKEN_SECRET_KEY || 'defaultSecretKey';
 
 const router = express.Router();
 const upload = multer().none();
+// Destination folder
+const destinationFolder = './uploads/users/';
+
+// Create the destination folder if it doesn't exist
+if (!fs.existsSync(destinationFolder)) {
+  fs.mkdirSync(destinationFolder, { recursive: true });
+}
+
 // Set storage engine
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, './uploads/'); // Specify the destination folder
-    },
-    filename: function (req, file, cb) {
-        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-    }
+  destination: function (req, file, cb) {
+    cb(null, destinationFolder);
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
 });
+
 const upload_single = multer({ storage }).single('profile_image');
 
 router.post("/register", upload, async (req, res) => {
