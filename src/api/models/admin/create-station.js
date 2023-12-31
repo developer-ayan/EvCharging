@@ -32,6 +32,16 @@ const stationSchema = new mongoose.Schema({
         default: null, // Set the default value here
         trim: true,
     },
+    start_time: {
+        type: String,
+        default: null, // Set the default value here
+        trim: true,
+    },
+    end_time: {
+        type: String,
+        default: null, // Set the default value here
+        trim: true,
+    },
     serial_no: {
         type: String,
         default: generateCustomSerialNumber,

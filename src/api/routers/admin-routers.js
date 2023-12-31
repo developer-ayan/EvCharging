@@ -3,6 +3,7 @@ const multer = require('multer')
 const router = express.Router();
 const upload = multer().none();
 const path = require('path');
+const moment = require('moment');
 const fs = require('fs');
 
 const {
@@ -24,17 +25,17 @@ const destinationFolder = './uploads/station_images/';
 
 // Create the destination folder if it doesn't exist
 if (!fs.existsSync(destinationFolder)) {
-  fs.mkdirSync(destinationFolder, { recursive: true });
+    fs.mkdirSync(destinationFolder, { recursive: true });
 }
 
 // Set storage engine
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, destinationFolder);
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-  }
+    destination: function (req, file, cb) {
+        cb(null, destinationFolder);
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+    }
 });
 
 const upload_single = multer({
@@ -98,7 +99,9 @@ router.post("/create_station", upload_single_station, async (req, res) => {
             unit_price,
             latitude,
             longitude,
-            location
+            location,
+            start_time,
+            end_time
         } = req.body;
 
         if (!station_name || !unit_price || !latitude, !longitude, !location) {
@@ -121,6 +124,8 @@ router.post("/create_station", upload_single_station, async (req, res) => {
                 name: location
             },
             station_image: req.file ? req.file.filename : null,
+            start_time,
+            end_time
         });
 
         res.status(201).json({
@@ -146,7 +151,9 @@ router.post("/edit_station", upload_single_station, async (req, res) => {
             unit_price,
             latitude,
             longitude,
-            location
+            location,
+            start_time,
+            end_time
         } = req.body;
         if (!_id) {
             return res.status(200).json({
@@ -166,6 +173,8 @@ router.post("/edit_station", upload_single_station, async (req, res) => {
 
         station.station_name = station_name || station.station_name;
         station.unit_price = unit_price || station.unit_price;
+        station.start_time = start_time || station.start_time;
+        station.end_time = end_time || station.end_time;
         station.location.coordinates = [parseFloat(longitude), parseFloat(latitude)] || station.location.coordinates;
         station.location.name = location || station.location.name;
 
