@@ -8,7 +8,9 @@ const Station = require('../models/admin/create-station')
 const Port = require('../models/admin/create-port')
 const StationradiusUsers = require('../models/admin/station-radius')
 const Rating = require('../models/logged-in/station-rating')
+const Wallet = require('../models/logged-in/wallet')
 const Booking = require('../models/logged-in/booking')
+const Transaction = require('../models/logged-in/transaction')
 const { DATE_FORMATE } = require('../../utils/urls')
 const ObjectId = require('mongodb').ObjectId;
 
@@ -75,7 +77,7 @@ router.post("/dashboard_stations", upload, async (req, res) => {
                             }
                         ],
                         as: "rating"
-                    }
+                    },
                 },
                 {
                     $unwind: {
@@ -90,8 +92,8 @@ router.post("/dashboard_stations", upload, async (req, res) => {
                         unit_price: { $first: "$unit_price" },
                         location: { $first: "$location" },
                         serial_no: { $first: "$serial_no" },
-                        averageRating: { $avg: { $ifNull: [{ $toDouble: "$rating.rating" }, 0] } }, // Calculate average rating, consider 0 if rating is null
-                        distance: { $first: { $round: [{ $divide: ["$distance", 1000] }, 2] } } // Convert meters to kilometers and round to 2 decimal places
+                        rating: { $avg: { $ifNull: [{ $toDouble: "$rating.rating" }, 0] } },
+                        distance: { $first: { $round: [{ $divide: ["$distance", 1000] }, 2] } }
                     }
                 }
             ]);
@@ -127,7 +129,7 @@ router.post("/station_detail", upload, async (req, res) => {
                     $project: {
                         _id: 1,
                         count: 1,
-                        avg: { $round: ['$avg', 1] }
+                        avg: { $round: ['$avg' , 1] }
                     }
                 }
             ]).exec();
@@ -283,6 +285,7 @@ router.post("/port_slots", upload, async (req, res) => {
                 const { location } = resonse;
                 const myLat = latitude;
                 const myLng = longitude;
+                const port_detail = await Port.findOne({  _id: port_id });
 
                 const lat = location?.coordinates[1] || 0;
                 const lng = location?.coordinates[0] || 0;
@@ -333,6 +336,7 @@ router.post("/port_slots", upload, async (req, res) => {
                             rating: stationRating?.length > 0 ? stationRating[0]?.avg : 0,
                             distance: distanceInKm ? distanceInKm.toFixed(2) : '0'
                         },
+                        port_detail : port_detail,
                         slots: filteredSlots
                     };
 
@@ -364,8 +368,9 @@ router.post("/port_slots", upload, async (req, res) => {
             ]).exec();
 
             const resonse = await Station.findOne({ _id: station_id });
-
+            
             if (resonse) {
+                const port_detail = await Port.findOne({  _id: port_id });
                 const { location } = resonse;
                 const myLat = latitude;
                 const myLng = longitude;
@@ -390,6 +395,7 @@ router.post("/port_slots", upload, async (req, res) => {
                             rating: stationRating?.length > 0 ? stationRating[0]?.avg : 0,
                             distance: distanceInKm ? distanceInKm.toFixed(2) : '0'
                         },
+                        port_detail : port_detail,
                         slots: slots
                     };
 
@@ -536,11 +542,34 @@ router.post("/booking_port", upload, async (req, res) => {
         if (!station_id || !port_id || !amount || !start_time || !end_time || !transaction_id) {
             return res.status(200).json({ status: false, message: 'All fields are required.' });
         } else {
-            const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type })
-            if (bookingSubmit) {
-                return res.status(200).json({ status: true, message: 'Booking submit successfully.' });
-            } else {
-                return res.status(200).json({ status: true, message: 'Something went wrong!' });
+            const findWallet = await Wallet.findOne({ user_id })
+            if(findWallet){
+                const wallet_balance = findWallet?.amount ?  parseFloat(findWallet?.amount) : 0.00
+                 if( wallet_balance  >= parseFloat(amount)){
+                    const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type })
+                    if (bookingSubmit) {
+                        const wallet_balance =  parseFloat(findWallet?.amount) - parseFloat(amount)
+                        const amountAdd = parseFloat(findWallet.amount) + parseFloat(amount)   
+                        findWallet.amount = wallet_balance || findWallet.amount;
+                        const updatedWallet = await findWallet.save();
+                        if(updatedWallet){
+                            const transaction = await Transaction.create({ user_id, transaction_id : '' , amount ,credit_or_debit : 'DB' , })
+                            if(transaction){
+                                return res.status(200).json({ status: true, message: 'Booking submit successfully.' });
+                            }else{
+                                return res.status(200).json({ status: false, message: 'Something issue from transaction' });
+                            }
+                        }else{
+                            return res.status(200).json({ status: false, message: 'Wallet transaction issue!' }); 
+                        }
+                    } else {
+                        return res.status(200).json({ status: false, message: 'Something went wrong!' });
+                    }
+                 }else{
+                    return res.status(200).json({ status: false, message: `You have account balance is ${wallet_balance}`});  
+                 }
+            }else{
+                return res.status(200).json({ status: false, message: `You have account balance is 0.00`});
             }
         }
     } catch (error) {
@@ -550,6 +579,65 @@ router.post("/booking_port", upload, async (req, res) => {
     }
 });
 
+
+router.post("/wallet", upload, async (req, res) => {
+    try {
+        const { user_id, account_type,transaction_id , amount   } = req.body
+        if (!user_id || !account_type || !transaction_id || !amount ) {
+            return res.status(200).json({ status: false, message: 'All fields are required.' });
+        } else {
+            const findWallet = await Wallet.findOne({ user_id })
+            if(findWallet){
+                const amountAdd = parseFloat(findWallet.amount) + parseFloat(amount)   
+                findWallet.amount = amountAdd || findWallet.amount;
+                const updatedWallet = await findWallet.save();
+                if (updatedWallet) {
+                    const transaction = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'CR' , })
+                    if(transaction){
+                        return res.status(200).json({ status: true, message: 'Credit amount in your wallet successfully.' });
+                    }else{
+                        return res.status(200).json({ status: false, message: 'Something issue from transaction' });
+                    }
+                } else {
+                    return res.status(200).json({ status: true, message: 'Something went wrong!' });
+                }
+            }else{
+                const credit = await Wallet.create({ user_id, account_type,transaction_id , amount })
+                if (credit) {
+                    const transaction = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'CR' , })
+                    if(transaction){
+                        return res.status(200).json({ status: true, message: 'Credit amount in your wallet successfully.' });
+                    }else{
+                        return res.status(200).json({ status: false, message: 'Something issue from transaction' });
+                    }
+                } else {
+                    return res.status(200).json({ status: true, message: 'Something went wrong!' });
+                }
+            }
+        }
+    } catch (error) {
+        res.status(200).json({ status: false, message: error.message });
+    }
+});
+
+router.post("/transaction", upload, async (req, res) => {
+ try {
+    const {user_id} = req.body
+    const findWallet = await Wallet.findOne({ user_id })
+    const findTransaction = await Transaction.find({ user_id }).sort({ _id: -1 }).exec()
+    if(findTransaction.length > 0 && findWallet){
+        const data = {
+            balance :  findWallet?.amount || '0.00',
+            transaction : findTransaction
+        }
+        res.status(200).json({ status: true, data : data, message: 'Transaction fetch successfully.' });
+    }else{
+        res.status(200).json({ status: false,  message: 'Transaction not found!' });
+    }
+ } catch (error) {
+    res.status(200).json({ status: false, message: error.message });
+}
+})
 
 
 function generateSlots(startMoment, endMoment, isBooked) {
