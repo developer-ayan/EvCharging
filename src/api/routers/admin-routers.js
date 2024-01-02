@@ -19,6 +19,7 @@ const StationradiusUsers = require('../models/admin/station-radius')
 const Port = require('../models/admin/create-port')
 const Rating = require('../models/logged-in/station-rating')
 const AuthMiddleware = require('../middlewares/authMiddleware');
+const Users = require('../models/auth/users');
 
 // Destination folder
 const destinationFolder = './uploads/station_images/';
@@ -207,7 +208,7 @@ router.post("/delete_station", upload, async (req, res) => {
         } = req.body;
 
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: 'Station not found'
             });
@@ -233,7 +234,7 @@ router.post("/station_detail", upload, async (req, res) => {
             _id
         } = req.body;
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: '_id is required'
             });
@@ -320,7 +321,7 @@ router.post("/edit_station_port", upload, async (req, res) => {
             slots
         } = req.body;
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: '_id is required'
             });
@@ -329,7 +330,7 @@ router.post("/edit_station_port", upload, async (req, res) => {
             _id
         });
         if (!port) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: 'Port not found'
             });
@@ -359,7 +360,7 @@ router.post("/station_port_detail", upload, async (req, res) => {
             _id
         } = req.body;
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: '_id is required'
             });
@@ -411,7 +412,7 @@ router.post("/station_port_list", upload, async (req, res) => {
             station_id
         } = req.body;
         if (!station_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: 'station_id is required'
             });
@@ -472,7 +473,7 @@ router.post("/delete_port", upload, async (req, res) => {
         } = req.body;
 
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: 'Port not found'
             });
@@ -628,7 +629,7 @@ router.post("/fetch_profile", upload, async (req, res) => {
             _id
         } = req.body;
         if (!_id) {
-            return res.status(404).json({
+            return res.status(200).json({
                 status: false,
                 message: '_id is required'
             });
@@ -773,6 +774,108 @@ router.post("/station_reviews", upload, async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(500).json({ status: false, data: [], message: 'Internal Server Error' });
+    }
+});
+
+router.post("/users", async (req, res) => {
+    try {
+        const users = await Users.find({}).sort({ _id: -1 }).exec()
+        res.status(200).json({
+            status: true,
+            data: users,
+            message: 'Users fetch successfully.'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+});
+
+router.post("/user_fetch_profile", upload, async (req, res) => {
+    try {
+        const {
+            _id
+        } = req.body;
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+        const user = await Users.findOne({
+            _id
+        });
+        if (!user) {
+            return res.status(200).json({
+                status: false,
+                message: 'User not found'
+            });
+        }else{
+            res.status(200).json({
+                status: true,
+                data: user,
+                message: 'Profile fetch successfully.'
+            });
+        }
+       
+    } catch (error) {
+        res.status(500).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+});
+
+router.post("/edit_user_detail", upload_single, async (req, res) => {
+    try {
+        const {
+            _id,
+            email,
+            name,
+            phone,
+            bike_mode,
+            status
+        } = req.body;
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+        const user = await Users.findOne({_id});
+        if (!user) {
+            return res.status(200).json({
+                status: false,
+                message: 'User not found'
+            });
+        }
+
+        user.email = email || user.email;
+        user.phone = phone || user.phone;
+        user.name = name || user.name;
+        user.bike_mode = bike_mode || user.bike_mode;
+        user.status = status || user.status;
+
+        if (req.file) {
+            user.profile_image = req.file.filename;
+        }
+
+        const updatedUser = await user.save();
+
+        res.status(200).json({
+            status: true,
+            message: 'Profile updated successfully'
+        });
+
+    } catch (error) {
+        const status = error.name === 'ValidationError' ? 400 : 500;
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
     }
 });
 

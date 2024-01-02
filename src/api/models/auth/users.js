@@ -20,9 +20,10 @@ const registerSchema = new mongoose.Schema({
         default: null, // Set the default value here
         trim: true,
     },
-    password: {
+    status: {
         type: String,
         trim: true,
+        default : 'active'
     },
     social_id: {
         type: String,

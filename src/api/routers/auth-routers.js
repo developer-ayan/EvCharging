@@ -105,7 +105,11 @@ router.post("/login", upload, async (req, res) => {
         if (!user) {
             return res.status(200).json({ status: false, message: 'User not found' });
         }else{
-            res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+            if(user?.status == 'active'){
+                res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+            }else{
+                res.status(200).json({ status: false, message: 'Your account has been suspended' });
+            }
         }
     } catch (error) {
         res.status(500).json({ status: false, message: 'Internal Server Error' });

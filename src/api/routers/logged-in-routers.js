@@ -797,6 +797,36 @@ router.post("/booking_history", upload,  async (req, res) => {
     }
 });
 
+router.post("/station_qr_code", upload,  async (req, res) => {
+    try {
+        const {serial_no} = req.body
+        if (!serial_no) {
+            return res.status(200).json({ status: false, message: 'serial_no is required.' });
+        }else{
+            const station_detail = await Station.findOne({ serial_no })
+        if(station_detail){
+            res.status(200).json({
+                status: true,
+                data: station_detail,
+                message: 'Station detail fetch successfully.'
+            });
+        }else{
+            res.status(200).json({
+                status: false,
+                message: 'Station not found!'
+            });
+        }
+}
+       
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+});
+
 
 function generateSlots(startMoment, endMoment, isBooked) {
     const slots = [];
