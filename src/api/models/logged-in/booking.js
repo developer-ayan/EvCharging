@@ -33,6 +33,16 @@ const bookingSchema = new mongoose.Schema({
         trim: true,
         default: 0,
     },
+    transaction_id: {
+        type: String,
+        trim: true,
+        default: null,
+    },
+    status: {
+        type: String,
+        trim: true,
+        default: 'pending',
+    },
     date: {
         type: String,
         trim: true,

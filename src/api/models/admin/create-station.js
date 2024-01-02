@@ -59,6 +59,6 @@ function generateCustomSerialNumber() {
 
 stationSchema.index({ location: '2dsphere' });
 
-const Stations = mongoose.model('station', stationSchema);
+const Stations = mongoose.model('stations', stationSchema);
 
 module.exports = Stations;

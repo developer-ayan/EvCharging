@@ -49,14 +49,14 @@ router.post("/dashboard_stations", upload, async (req, res) => {
             return res.status(200).json({ status: false, message: 'latitude and longitude are required' });
         } else {
             const radius = await StationradiusUsers.find({}).sort({ _id: -1 }).exec()
-            const set_radius = radius?.length > 0 ? parseFloat(radius?.[0]?.toObject()?.radius) : 10
+            const set_radius = radius?.length > 0 ? Number(radius?.[0]?.toObject()?.radius) : 10
 
             const result = await Station.aggregate([
                 {
                     $geoNear: {
                         near: {
                             type: 'Point',
-                            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+                            coordinates: [Number(longitude), Number(latitude)]
                         },
                         distanceField: 'distance',
                         maxDistance: set_radius * 1000, // Convert kilometers to meters
@@ -137,9 +137,10 @@ router.post("/station_detail", upload, async (req, res) => {
 
             await Promise.all([
                 Station.findOne({ _id }),
-                Port.find({ station_id: _id }).sort({ _id: -1 }).exec()
+                Port.find({ station_id: _id }).sort({ _id: -1 }).exec(),
             ]).then((resonse) => {
                 if (resonse[0]) {
+
                     const myLat = latitude
                     const myLng = longitude
 
@@ -389,6 +390,13 @@ router.post("/port_slots", upload, async (req, res) => {
                 } else {
                     const slots = generateSlots(startMoment, endMoment, false);
 
+                    const currentTime = moment(); // Get the current time
+
+                    const currentMoment = moment(currentTime, 'h:mm A');
+
+                    // Filter the slots based on the current time
+                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
+
                     const data = {
                         station_detail: {
                             ...resonse?.toObject(),
@@ -396,7 +404,7 @@ router.post("/port_slots", upload, async (req, res) => {
                             distance: distanceInKm ? distanceInKm.toFixed(2) : '0'
                         },
                         port_detail : port_detail,
-                        slots: slots
+                        slots: filteredSlots
                     };
 
                     res.status(200).json({ status: true, data, message: 'Station detail fetch successfully.' });
@@ -538,38 +546,97 @@ router.post("/port_slot_reservation", upload, async (req, res) => {
 
 router.post("/booking_port", upload, async (req, res) => {
     try {
-        const { user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type } = req.body
-        if (!station_id || !port_id || !amount || !start_time || !end_time || !transaction_id) {
+        const { user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type  } = req.body
+        if (!station_id || !port_id || !amount || !start_time || !end_time) {
             return res.status(200).json({ status: false, message: 'All fields are required.' });
         } else {
-            const findWallet = await Wallet.findOne({ user_id })
-            if(findWallet){
-                const wallet_balance = findWallet?.amount ?  parseFloat(findWallet?.amount) : 0.00
-                 if( wallet_balance  >= parseFloat(amount)){
-                    const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type })
-                    if (bookingSubmit) {
-                        const wallet_balance =  parseFloat(findWallet?.amount) - parseFloat(amount)
-                        const amountAdd = parseFloat(findWallet.amount) + parseFloat(amount)   
-                        findWallet.amount = wallet_balance || findWallet.amount;
-                        const updatedWallet = await findWallet.save();
-                        if(updatedWallet){
-                            const transaction = await Transaction.create({ user_id, transaction_id : '' , amount ,credit_or_debit : 'DB' , })
-                            if(transaction){
-                                return res.status(200).json({ status: true, message: 'Booking submit successfully.' });
+            if(account_type == 'WL'){
+                const findWallet = await Wallet.findOne({ user_id })
+                if(findWallet){
+                    const wallet_balance = findWallet?.amount ?  Number(findWallet?.amount) : 0.00
+                     if( wallet_balance  >= Number(amount)){
+                     
+                            const wallet_balance =  (Number(findWallet?.amount) - Number(amount))
+                            const updatedWallet = await Wallet.updateOne({ user_id }, { $set: { amount: wallet_balance } });
+                            if(updatedWallet){
+                                const transaction = await Transaction.create({ user_id , amount ,credit_or_debit : 'DB' , })
+                                if(transaction){
+                                     const bookingSubmit = await Booking.create({ user_id, station_id, transaction_id : transaction?.transaction_id , port_id, amount, start_time, end_time, account_type , status : 'pending' })
+                                    return res.status(200).json({ status: true,data : bookingSubmit, message: 'Booking submit successfully.' });
+                                }else{
+                                    return res.status(200).json({ status: false, message: 'Something issue from transaction' });
+                                }
                             }else{
-                                return res.status(200).json({ status: false, message: 'Something issue from transaction' });
+                                return res.status(200).json({ status: false, message: 'Wallet transaction issue!' }); 
                             }
+                        
+                     }else{
+                        return res.status(200).json({ status: false, message: `You have account balance is ${wallet_balance}`});  
+                     }
+                }else{
+                    return res.status(200).json({ status: false, message: `You have account balance is 0.00`});
+                }
+            }else{
+                const findWallet = await Wallet.findOne({ user_id })
+                if(findWallet){
+                    const creditAmount = Number(findWallet.amount)  + Number(amount)
+                    const updateResult = await Wallet.updateOne({ user_id }, { $set: { amount: creditAmount } });
+                    if(updateResult){
+                        const transaction = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'CR' , })
+                        if(transaction){
+                                 const findWallet = await Wallet.findOne({ user_id });
+                                 const debitAmount = (Number(findWallet.amount) - Number(amount))
+                                    const updateResult = await Wallet.updateOne({ user_id }, { $set: { amount: debitAmount } });
+                                    if(updateResult){
+                                      const transactionDebit = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'DB' })
+                                      if(transactionDebit){
+                                        const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type , status : 'pending' })
+                                        if(bookingSubmit){
+                                            return res.status(200).json({ status: true, data : bookingSubmit,transaction_id: transactionDebit?.transaction_id, message: 'Booking submit successfully.' });
+                                        }else{
+                                            return res.status(200).json({ status: false, message: 'Something issue from booking' });
+                                        }
+                                      }else{
+                                        return res.status(200).json({ status: false, message: 'Something issue in your booking transaction' });
+                                      }
+                                    }else{
+                                        return res.status(200).json({ status: false, message: 'Something issue from wallet debit for booking' });
+                                    }
                         }else{
-                            return res.status(200).json({ status: false, message: 'Wallet transaction issue!' }); 
+                            return res.status(200).json({ status: false, message: 'Something issue from transaction' });
+                        }
+                    }else{
+                        return res.status(200).json({ status: false, message: 'Something issue from wallet credit!' });
+                    }
+                }else{
+                    const credit = await Wallet.create({ user_id, account_type,transaction_id , amount })
+                    if (credit) {
+                        const transaction = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'CR' , })
+                        if(transaction){
+                                 const debitAmount = (Number(credit.amount) - Number(amount))   
+                                    const updateResult = await Wallet.updateOne({ user_id }, { $set: { amount: debitAmount } });
+                                    if(updateResult){
+                                      const transactionDebit = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'DB' })
+                                      if(transactionDebit){
+                                        const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type , status : 'pending' })
+                                        if(bookingSubmit){
+                                            return res.status(200).json({ status: true,data : bookingSubmit, transaction_id: transactionDebit?.transaction_id,  message: 'Booking submit successfully.' });
+                                        }else{
+                                            return res.status(200).json({ status: false, message: 'Something issue from booking' });
+                                        }
+                                      }else{
+                                        return res.status(200).json({ status: false, message: 'Something issue in your booking transaction' });
+                                      }
+                                    }else{
+                                        return res.status(200).json({ status: false, message: 'Something issue from wallet debit for booking' });
+                                    }
+                        }else{
+                            return res.status(200).json({ status: false, message: 'Something issue from transaction' });
                         }
                     } else {
-                        return res.status(200).json({ status: false, message: 'Something went wrong!' });
+                        return res.status(200).json({ status: true, message: 'Something went wrong!' });
                     }
-                 }else{
-                    return res.status(200).json({ status: false, message: `You have account balance is ${wallet_balance}`});  
-                 }
-            }else{
-                return res.status(200).json({ status: false, message: `You have account balance is 0.00`});
+                }
             }
         }
     } catch (error) {
@@ -582,13 +649,13 @@ router.post("/booking_port", upload, async (req, res) => {
 
 router.post("/wallet", upload, async (req, res) => {
     try {
-        const { user_id, account_type,transaction_id , amount   } = req.body
+        const { user_id, account_type, transaction_id , amount   } = req.body
         if (!user_id || !account_type || !transaction_id || !amount ) {
             return res.status(200).json({ status: false, message: 'All fields are required.' });
         } else {
             const findWallet = await Wallet.findOne({ user_id })
             if(findWallet){
-                const amountAdd = parseFloat(findWallet.amount) + parseFloat(amount)   
+                const amountAdd = Number(findWallet.amount) + Number(amount)   
                 findWallet.amount = amountAdd || findWallet.amount;
                 const updatedWallet = await findWallet.save();
                 if (updatedWallet) {
@@ -639,6 +706,97 @@ router.post("/transaction", upload, async (req, res) => {
 }
 })
 
+router.post("/transaction_successfully", upload, async (req, res) => {
+    try {
+        const { station_id, port_id , booking_id , start_time, end_time } = req.body;
+
+        if (!station_id || !port_id || !start_time || !end_time) {
+            return res.status(200).json({ status: false, message: 'All fields are required.' });
+        } else {
+            try {
+                const [station_detail, port_detail , booking_detail] = await Promise.all([
+                    Station.findOne({ _id: station_id }),
+                    Port.findOne({ _id: port_id }),
+                    Booking.findOne({ _id: booking_id}),
+                ]);
+
+                if (station_detail && port_detail && booking_detail) {
+                    const data = {
+                        station_detail,
+                        port_detail,
+                        unit_price: hourConvertIntoMinute(station_detail.unit_price, start_time, end_time),
+                        transaction_id : booking_detail?.transaction_id
+                    };
+
+                    return res.status(200).json({ status: true, data, message: 'Transaction detail fetch successfully.' });
+                } else {
+                    return res.status(200).json({ status: false, message: 'Station, Port, Booking not found.' });
+                }
+            } catch (error) {
+                return res.status(200).json({ status: false, message: 'Something went wrong!' });
+            }
+        }
+    } catch (error) {
+        return res.status(200).json({ status: false, message: error.message });
+    }
+});
+
+
+router.post("/booking_history", upload,  async (req, res) => {
+    try {
+        const {user_id} = req.body
+        if (!user_id) {
+            return res.status(200).json({ status: false, message: 'user_id is required.' });
+        }else{
+            // const bookinghistory = await Booking.find({user_id}).sort({ _id: -1 }).exec()
+
+            const bookinghistory = await Booking.aggregate([
+                {
+                    $match: {
+                        user_id: user_id
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "stations",
+                        let: { stationId: "$station_id" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$_id", { $toObjectId: "$$stationId" }]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "station_detail"
+                    },
+                },
+                {
+                    $unwind: "$station_detail"
+                },
+            ]);
+            
+            console.log(JSON.stringify(bookinghistory, null, 2));
+            
+            
+
+            res.status(200).json({
+                status: true,
+                data: bookinghistory,
+                message: 'Booking history fetch successfully.'
+            });
+        }
+       
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+});
+
 
 function generateSlots(startMoment, endMoment, isBooked) {
     const slots = [];
@@ -646,7 +804,7 @@ function generateSlots(startMoment, endMoment, isBooked) {
 
     while (currentSlot.isSameOrBefore(endMoment)) {
         slots.push({ time: currentSlot.format('h:mm A'), isBooked: isBooked });
-        currentSlot.add(1, 'hours');
+        currentSlot.add(0.50, 'hours');
     }
 
     return slots;
@@ -658,7 +816,7 @@ function hourConvertIntoMinute(per_min_unit, start_time, end_time) {
     const endTime = moment(end_time, 'h:mm A');
 
     // Calculate the time difference in minutes
-    const timeDifferenceInMinutes = endTime.diff(startTime, 'minutes');
+    const timeDifferenceInMinutes = endTime.diff(startTime, 'hours');
 
     // Ensure the time difference is non-negative
     const validTimeDifference = Math.max(timeDifferenceInMinutes, 0);
@@ -666,7 +824,6 @@ function hourConvertIntoMinute(per_min_unit, start_time, end_time) {
     // Calculate the cost
     const cost = validTimeDifference * per_min_unit;
 
-    console.log(`Total cost: $${cost}`);
     return cost;
 }
 
