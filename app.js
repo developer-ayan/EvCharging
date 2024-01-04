@@ -15,7 +15,6 @@ const authRoutes = require('./src/api/routers/auth-routers');
 const loggedInRoutes = require('./src/api/routers/logged-in-routers');
 const adminRoutes = require('./src/api/routers/admin-routers');
 
-
 app.use('/auth', authRoutes);
 app.use('/app/logged_in', loggedInRoutes);
 app.use('/admin', adminRoutes);
