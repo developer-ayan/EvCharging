@@ -5,17 +5,21 @@ const Port = require('../../models/admin/create-port')
 const StationradiusUsers = require('../../models/admin/station-radius')
 const Rating = require('../../models/logged-in/station-rating')
 const Users = require('../../models/auth/users');
+const CountryCode = require('../../models/admin/country-code')
+const Stations = require('../../models/admin/create-station')
+const Vehicles = require('../../models/admin/vehicle')
 
 // object id
-
 const ObjectId = require('mongodb').ObjectId;
 
 // moment
-
 const moment = require('moment')
 
+// helper functions
+const { delete_file } = require('../../../utils/helpers')
 
- const login = async (req, res) => {
+
+const login = async (req, res) => {
     try {
         const {
             email,
@@ -23,7 +27,7 @@ const moment = require('moment')
         } = req.body;
 
         if (!email || !password) {
-            return res.status(400).json({
+            return res.status(200).json({
                 status: false,
                 message: 'All fields are required'
             });
@@ -50,19 +54,17 @@ const moment = require('moment')
         });
     } catch (error) {
         console.error('error', error);
-        const status = error.name === 'ValidationError' ? 400 : 500;
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal server error'
         });
     }
 }
 
- const createStation = async (req, res) => {
+const createStation = async (req, res) => {
     try {
         const {
             station_name,
-            unit_price,
             latitude,
             longitude,
             location,
@@ -70,7 +72,7 @@ const moment = require('moment')
             end_time
         } = req.body;
 
-        if (!station_name || !unit_price || !latitude, !longitude, !location) {
+        if (!station_name || !latitude, !longitude, !location) {
             return res.status(200).json({
                 status: false,
                 message: 'All fields are required'
@@ -81,7 +83,6 @@ const moment = require('moment')
 
         await Stations.create({
             station_name,
-            unit_price,
             latitude,
             longitude,
             location: {
@@ -94,12 +95,11 @@ const moment = require('moment')
             end_time
         });
 
-        res.status(201).json({
+        res.status(200).json({
             status: true,
             message: 'Station created successfully'
         });
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -113,7 +113,6 @@ const editStation = async (req, res) => {
         const {
             _id,
             station_name,
-            unit_price,
             latitude,
             longitude,
             location,
@@ -137,13 +136,13 @@ const editStation = async (req, res) => {
         }
 
         station.station_name = station_name || station.station_name;
-        station.unit_price = unit_price || station.unit_price;
         station.start_time = start_time || station.start_time;
         station.end_time = end_time || station.end_time;
         station.location.coordinates = [parseFloat(longitude), parseFloat(latitude)] || station.location.coordinates;
         station.location.name = location || station.location.name;
 
         if (req.file) {
+            delete_file('/uploads/station_images/' , station.station_image)
             station.station_image = req.file.filename;
         }
 
@@ -156,7 +155,6 @@ const editStation = async (req, res) => {
         });
 
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -185,7 +183,7 @@ const deleteStation = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -218,8 +216,6 @@ const stationDetail = async (req, res) => {
             message: 'Station fetch successfully.'
         });
     } catch (error) {
-        console.log('error', error)
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -237,7 +233,7 @@ const stationList = async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -249,9 +245,9 @@ const createStationPort = async (req, res) => {
         const {
             station_id,
             port_type,
-            slots
+            unit_price
         } = req.body;
-        if (!station_id || !port_type || !slots) {
+        if (!station_id || !port_type || !unit_price) {
             return res.status(200).json({
                 status: false,
                 message: 'All fields are required'
@@ -260,15 +256,14 @@ const createStationPort = async (req, res) => {
             await Port.create({
                 station_id,
                 port_type,
-                slots
+                unit_price
             });
-            res.status(201).json({
+            res.status(200).json({
                 status: true,
                 message: 'Port created successfully'
             });
         }
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -281,8 +276,8 @@ const editStationPort = async (req, res) => {
 
         const {
             _id,
-            port_typet,
-            slots
+            port_type,
+            unit_price
         } = req.body;
         if (!_id) {
             return res.status(200).json({
@@ -300,17 +295,21 @@ const editStationPort = async (req, res) => {
             });
         } else {
             port.port_type = port_type || port.port_type;
-            port.slots = slots || port.slots;
-
-            const updatedStation = await port.save();
-
-            res.status(200).json({
-                status: true,
-                message: 'Station updated successfully'
-            });
+            port.unit_price = unit_price || port.unit_price;
+            const updatePort = await port.save();
+            if (updatePort) {
+                res.status(200).json({
+                    status: true,
+                    message: 'Station updated successfully'
+                });
+            } else {
+                res.status(200).json({
+                    status: false,
+                    message: 'Something went wrong!'
+                });
+            }
         }
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -339,29 +338,14 @@ const stationPortDetail = async (req, res) => {
                 message: 'Port not found'
             });
         } else {
-            const station = await Station.findOne({
-                _id: port?.station_id
+            res.status(200).json({
+                status: true,
+                data: port,
+                message: 'Port fetch successfully.'
             });
-            if (!station) {
-                return res.status(200).json({
-                    status: false,
-                    message: 'Station not found'
-                });
-            } else {
-                const data = {
-                    ...port.toObject(),
-                    unit_price: station?.unit_price
-                };
-                res.status(200).json({
-                    status: true,
-                    data,
-                    message: 'Port fetch successfully.'
-                });
-            }
+
         }
     } catch (error) {
-        console.log('error', error);
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -369,7 +353,7 @@ const stationPortDetail = async (req, res) => {
     }
 }
 
-const stationPortList= async (req, res) => {
+const stationPortList = async (req, res) => {
     try {
         const {
             station_id
@@ -391,36 +375,16 @@ const stationPortList= async (req, res) => {
                 status: false,
                 message: 'Ports not found'
             });
-        }
-
-        const station = await Station.findOne({
-            _id: port?.[0]?.station_id
-        });
-        if (!station) {
-            return res.status(200).json({
-                status: false,
-                message: 'Station not found'
-            });
         } else {
-
-            const modified_array = port?.map((item, index) => {
-                return {
-                    ...item.toObject(),
-                    unit_price: station?.unit_price
-                }
-            })
-
             res.status(200).json({
                 status: true,
-                data: modified_array,
+                data: port,
                 message: 'Ports fetch successfully.'
             });
         }
 
 
     } catch (error) {
-        console.log('error', error)
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -449,7 +413,7 @@ const deletePort = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -488,7 +452,7 @@ const register = async (req, res) => {
             name
         });
         // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-        res.status(201).json({
+        res.status(200).json({
             status: true,
             data: user,
             message: 'User registered successfully'
@@ -501,7 +465,7 @@ const register = async (req, res) => {
     }
 }
 
-const registerationOtpVerification =  async (req, res) => {
+const registerationOtpVerification = async (req, res) => {
     try {
         const randomFourDigitNumber = Math.floor(Math.random() * 9000) + 1000;
         const {
@@ -559,26 +523,44 @@ const editProfile = async (req, res) => {
                 status: false,
                 message: 'User not found'
             });
+        } else {
+            const existingUsers = await AdminUsers.findOne({
+                $and: [
+                    { _id: { $ne: _id } }, // Exclude the current record
+                    { $or: [{ email }] }
+                ]
+            });
+
+            if (existingUsers) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'email is already exist'
+                });
+            } else {
+                user.email = email || user.email;
+                user.password = password || user.password;
+                user.name = name || user.name;
+
+                if (req.file) {
+                    delete_file('/uploads/users/' , user.profile_image)
+                    user.profile_image = req.file.filename;
+                }
+
+                const updatedUser = await user.save();
+                if (updatedUser) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Profile updated successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Something went wrong!'
+                    });
+                }
+            }
         }
-
-        user.email = email || user.email;
-        user.password = password || user.password;
-        user.name = name || user.name;
-
-        if (req.file) {
-            user.profile_image = req.file.filename;
-        }
-
-        const updatedUser = await user.save();
-
-        res.status(200).json({
-            status: true,
-            data: updatedUser,
-            message: 'Profile updated successfully'
-        });
-
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -612,7 +594,7 @@ const fetchProfile = async (req, res) => {
             message: 'Profile fetch successfully.'
         });
     } catch (error) {
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -645,7 +627,7 @@ const createStationRadius = async (req, res) => {
             radius
         });
         // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-        res.status(201).json({
+        res.status(200).json({
             status: true,
             message: 'Radius add successfully'
         });
@@ -676,21 +658,24 @@ const editStationRadius = async (req, res) => {
         if (!fetchRadius) {
             return res.status(200).json({
                 status: false,
-                message: 'User not found'
+                message: 'Radius not found'
             });
+        } else {
+            fetchRadius.radius = radius || fetchRadius.radius;
+            const updatedRadius = await fetchRadius.save();
+            if (updatedRadius) {
+                res.status(200).json({
+                    status: true,
+                    message: 'Radius updated successfully'
+                });
+            } else {
+                res.status(200).json({
+                    status: false,
+                    message: 'Somthing went wrong!'
+                });
+            }
         }
-
-        fetchRadius.radius = radius || fetchRadius.radius;
-
-        const updatedRadius = await fetchRadius.save();
-
-        res.status(200).json({
-            status: true,
-            message: 'Radius updated successfully'
-        });
-
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
@@ -705,7 +690,7 @@ const fetchRadius = async (req, res) => {
         if (!radius) {
             return res.status(200).json({
                 status: false,
-                message: 'User not found'
+                message: 'Radius not found'
             });
         }
         res.status(200).json({
@@ -714,7 +699,7 @@ const fetchRadius = async (req, res) => {
             message: 'Radius fetch successfully.'
         });
     } catch (error) {
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -736,7 +721,7 @@ const stationReviews = async (req, res) => {
         }
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ status: false, data: [], message: 'Internal Server Error' });
+        return res.status(200).json({ status: false, data: [], message: 'Internal Server Error' });
     }
 }
 
@@ -750,7 +735,7 @@ const users = async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -776,16 +761,16 @@ const userFetchDetail = async (req, res) => {
                 status: false,
                 message: 'User not found'
             });
-        }else{
+        } else {
             res.status(200).json({
                 status: true,
                 data: user,
                 message: 'Profile fetch successfully.'
             });
         }
-       
+
     } catch (error) {
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -808,7 +793,7 @@ const userEditDetail = async (req, res) => {
                 message: '_id is required'
             });
         }
-        const user = await Users.findOne({_id});
+        const user = await Users.findOne({ _id });
         if (!user) {
             return res.status(200).json({
                 status: false,
@@ -834,10 +819,309 @@ const userEditDetail = async (req, res) => {
         });
 
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({
             status: false,
             message: error.message
+        });
+    }
+}
+
+const createCountryCode = async (req, res) => {
+    try {
+        const { country_code, country_name, country_short_name } = req.body;
+
+        // Check for missing fields
+        if (!country_code || !country_name || !country_short_name) {
+            return res.status(200).json({
+                status: false,
+                message: 'All fields are required'
+            });
+        } else {
+            // Check if country code, country name, or country short name already exist
+            const existingCountry = await CountryCode.findOne({
+                $or: [
+                    { country_code },
+                    { country_name },
+                    { country_short_name }
+                ]
+            });
+
+            if (existingCountry) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'Country code, country name, or country short name already exists'
+                });
+            } else {
+                // Create country code
+                const countryCode = await CountryCode.create({
+                    country_code,
+                    country_short_name,
+                    country_name,
+                    country_image: req.file ? req.file.filename : null,
+                });
+
+                // Check if the creation was successful
+                if (countryCode) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Country code created successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Failed to create country code'
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error creating country code:', error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+};
+
+const editCountryCode = async (req, res) => {
+    try {
+
+        const { _id, country_code, country_name, country_short_name } = req.body;
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+        const countryCode = await CountryCode.findOne({
+            _id
+        });
+        if (!countryCode) {
+            return res.status(200).json({
+                status: false,
+                message: 'Country code not found'
+            });
+        } else {
+
+            const existingCountry = await CountryCode.findOne({
+                $and: [
+                    { _id: { $ne: _id } }, // Exclude the current record
+                    { $or: [{ country_code }, { country_name }, { country_short_name }] }
+                ]
+            });
+
+            if (existingCountry) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'Country code, country name, or country short name already exists'
+                });
+            } else {
+                countryCode.country_code = country_code || countryCode.country_code;
+                countryCode.country_name = country_name || countryCode.country_name;
+                countryCode.country_short_name = country_short_name || countryCode.country_short_name;
+
+                if (req.file) {
+                    delete_file('/uploads/country_images/' , countryCode.country_image)
+                    countryCode.country_image = req.file.filename;
+                }
+
+                const updatedCountryCode = await countryCode.save();
+                if (updatedCountryCode) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Country code updated successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Something went wrong!'
+                    });
+                }
+            }
+        }
+
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
+
+const fetchCountryCodes = async (req, res) => {
+    try {
+        const countryCode = await CountryCode.find({}).sort({ _id: -1 }).exec()
+        res.status(200).json({
+            status: true,
+            data: countryCode,
+            message: 'Country code fetch successfully.'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const fetchCountryCodeDetail = async (req, res) => {
+    try {
+        const { _id } = req.body;
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        } else {
+            const countryCode = await CountryCode.findOne({ _id }).sort({ _id: -1 }).exec()
+            res.status(200).json({
+                status: true,
+                data: countryCode,
+                message: 'Country code fetch successfully.'
+            });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const createVehicleMode = async (req, res) => {
+    try {
+        const { vehicle_name, model_no } = req.body;
+
+        // Check for missing fields
+        if (!vehicle_name) {
+            return res.status(200).json({
+                status: false,
+                message: 'Vehicle is required'
+            });
+        } else {
+            // Check if country code, country name, or country short name already exist
+            const existingCountry = await Vehicles.findOne({
+                $or: [
+                    { vehicle_name, model_no },
+                ]
+            });
+
+            if (existingCountry) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'Vehicle name is already exist'
+                });
+            } else {
+                // Create country code
+                const vehicleCreate = await Vehicles.create({ vehicle_name, model_no });
+                // Check if the creation was successful
+                if (vehicleCreate) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Vehicle created successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Failed to create vehicle'
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+};
+
+const editVehicleMode = async (req, res) => {
+    try {
+        const { _id, vehicle_name, model_no } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const findVehicle = await Vehicles.findOne({
+            _id
+        });
+
+        if (!findVehicle) {
+            return res.status(200).json({
+                status: false,
+                message: 'Vehicle not found'
+            });
+        } else {
+            findVehicle.vehicle_name = vehicle_name || findVehicle.vehicle_name;
+            findVehicle.model_no = model_no || findVehicle.model_no;
+
+            const updatedVehicle = await findVehicle.save();
+
+            if (updatedVehicle) {
+                res.status(200).json({
+                    status: true,
+                    message: 'Vehicle updated successfully'
+                });
+            } else {
+                res.status(200).json({
+                    status: false,
+                    message: 'Something went wrong!'
+                });
+            }
+        }
+    } catch (error) {
+        res.status(status).json({
+            status: false,
+            message: error.message
+        });
+    }
+};
+
+const fetchVehicles = async (req, res) => {
+    try {
+        const countryCode = await Vehicles.find({}).sort({ _id: -1 }).exec()
+        res.status(200).json({
+            status: true,
+            data: countryCode,
+            message: 'Vehicles fetch successfully.'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const fetchVehicleDetail = async (req, res) => {
+    try {
+        const { _id } = req.body;
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        } else {
+            const countryCode = await Vehicles.findOne({ _id }).sort({ _id: -1 }).exec()
+            res.status(200).json({
+                status: true,
+                data: countryCode,
+                message: 'Vehicle fetch successfully.'
+            });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
         });
     }
 }
@@ -849,20 +1133,28 @@ module.exports = {
     deleteStation,
     stationDetail,
     stationList,
-createStationPort,
-editStationPort,
-stationPortDetail,
-stationPortList,
-deletePort,
-register,
-registerationOtpVerification,
-editProfile,
-fetchProfile,
-createStationRadius,
-editStationRadius,
-fetchRadius,
-stationReviews,
-users,
-userFetchDetail,
-userEditDetail
-  };
+    createStationPort,
+    editStationPort,
+    stationPortDetail,
+    stationPortList,
+    deletePort,
+    register,
+    registerationOtpVerification,
+    editProfile,
+    fetchProfile,
+    createStationRadius,
+    editStationRadius,
+    fetchRadius,
+    stationReviews,
+    users,
+    userFetchDetail,
+    userEditDetail,
+    createCountryCode,
+    editCountryCode,
+    fetchCountryCodes,
+    fetchCountryCodeDetail,
+    createVehicleMode,
+    editVehicleMode,
+    fetchVehicles,
+    fetchVehicleDetail
+};

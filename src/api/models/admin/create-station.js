@@ -7,11 +7,6 @@ const stationSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
-    unit_price: {
-        type: String,
-        required: true,
-        trim: true,
-    },
     location: {
         type: {
             type: String,

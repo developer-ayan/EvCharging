@@ -28,13 +28,19 @@ const {
   stationReviews,
   users,
   userFetchDetail,
-  userEditDetail
+  userEditDetail,
 } = require('../controllers/admin');
 
 // Destination folder
 const destinationFolder = './uploads/station_images/';
+const countryFolder = './uploads/country_images/';
 
 // Create the destination folder if it doesn't exist
+
+if (!fs.existsSync(countryFolder)) {
+  fs.mkdirSync(countryFolder, { recursive: true });
+}
+
 if (!fs.existsSync(destinationFolder)) {
   fs.mkdirSync(destinationFolder, { recursive: true });
 }
@@ -52,12 +58,11 @@ const storage = multer.diskStorage({
 const upload_single = multer({ storage }).single('profile_image');
 const upload_single_station = multer({ storage }).single('station_image');
 
-
 // auth
 
 router.post("/login", upload, login);
 router.post("/register", upload, register);
-router.post("/registration_otp_verfication", upload,registerationOtpVerification);
+router.post("/registration_otp_verfication", upload, registerationOtpVerification);
 
 // admin profile 
 
@@ -76,8 +81,8 @@ router.post("/delete_station", upload, deleteStation);
 
 router.post("/station_port_list", upload, stationPortList);
 router.post("/create_station_port", upload, createStationPort);
-router.post("/edit_station_port", upload,editStationPort);
-router.post("/station_port_detail", upload,stationPortDetail);
+router.post("/edit_station_port", upload, editStationPort);
+router.post("/station_port_detail", upload, stationPortDetail);
 router.post("/delete_port", upload, deletePort);
 router.post("/station_reviews", upload, stationReviews);
 
@@ -90,7 +95,7 @@ router.post("/fetch_radius", upload, fetchRadius);
 // app users
 
 router.post("/users", users);
-router.post("/user_fetch_profile", upload,userFetchDetail);
-router.post("/edit_user_detail", upload_single,userEditDetail);
+router.post("/user_fetch_profile", upload, userFetchDetail);
+router.post("/edit_user_detail", upload_single, userEditDetail);
 
 module.exports = router;

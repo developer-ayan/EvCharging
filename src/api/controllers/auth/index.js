@@ -8,9 +8,14 @@ const ObjectId = require('mongodb').ObjectId;
 
 const moment = require('moment')
 
-const register =  async (req, res) => {
+// helper function 
+
+const { delete_file } = require('../../../utils/helpers');
+
+
+const register = async (req, res) => {
     try {
-        const { name, phone, email , social_id } = req.body;
+        const { name, phone, email, social_id } = req.body;
 
         if (!name || !phone) {
             return res.status(200).json({ status: false, message: 'All fields are required' });
@@ -23,10 +28,10 @@ const register =  async (req, res) => {
             return res.status(200).json({ status: false, message: 'Phone number already exists' });
         } else if (existingEmailUser) {
             return res.status(200).json({ status: false, message: 'Email already exists' });
-        }else{
+        } else {
             const user = await Users.create({ name, phone, email });
             // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
-            res.status(200).json({ status: true, data: user,  message: 'User registered successfully' });
+            res.status(200).json({ status: true, data: user, message: 'User registered successfully' });
         }
     } catch (error) {
         console.error(error);
@@ -34,43 +39,43 @@ const register =  async (req, res) => {
     }
 }
 
-const registerSocialAccount =  async (req, res) => {
+const registerSocialAccount = async (req, res) => {
     try {
-        const { social_id , name , phone, email } = req.body;
+        const { social_id, name, phone, email } = req.body;
 
         if (!social_id) {
             return res.status(200).json({ status: false, message: 'social_id is required' });
-        }else{
+        } else {
             const user = await Users.findOne({ social_id });
 
             if (user) {
                 return res.status(200).json({ status: false, message: 'This account already registered.' });
-            }else{
-                const user = await Users.create({ name , phone, email , social_id });
-                return res.status(200).json({ status: true, data : user, message: 'User registered successfully' });
+            } else {
+                const user = await Users.create({ name, phone, email, social_id });
+                return res.status(200).json({ status: true, data: user, message: 'User registered successfully' });
             }
         }
     } catch (error) {
-        res.status(500).json({ status: false, message: 'Internal Server Error' });
+        res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
 
 const socialLogin = async (req, res) => {
     try {
-        const { social_id , name , phone, email } = req.body;
+        const { social_id, name, phone, email } = req.body;
 
         if (!social_id) {
             return res.status(200).json({ status: false, message: 'social_id is required' });
-        }else{
+        } else {
             const user = await Users.findOne({ social_id });
             if (user) {
-                return res.status(200).json({ status: true, data : user, message: 'Login successfully.' });
-            }else{
+                return res.status(200).json({ status: true, data: user, message: 'Login successfully.' });
+            } else {
                 res.status(200).json({ status: false, message: 'User not found!' });
             }
         }
     } catch (error) {
-        res.status(500).json({ status: false, message: 'Internal Server Error' });
+        res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
 
@@ -82,15 +87,15 @@ const login = async (req, res) => {
 
         if (!user) {
             return res.status(200).json({ status: false, message: 'User not found' });
-        }else{
-            if(user?.status == 'active'){
+        } else {
+            if (user?.status == 'active') {
                 res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
-            }else{
+            } else {
                 res.status(200).json({ status: false, message: 'Your account has been suspended' });
             }
         }
     } catch (error) {
-        res.status(500).json({ status: false, message: 'Internal Server Error' });
+        res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
 
@@ -98,18 +103,18 @@ const fetchProfile = async (req, res) => {
     try {
         const { _id } = req.body;
         if (!_id) {
-            return res.status(404).json({ status: false, message: '_id is required' });
-        }else{
+            return res.status(200).json({ status: false, message: '_id is required' });
+        } else {
             const user = await Users.findOne({ _id });
             if (!user) {
                 return res.status(200).json({ status: false, message: 'User not found' });
-            }else{
+            } else {
                 res.status(200).json({ status: true, data: user, message: 'Profile fetch successfully.' });
             }
         }
-        
+
     } catch (error) {
-        res.status(500).json({ status: false, message: 'Internal Server Error' });
+        res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
 
@@ -132,31 +137,49 @@ const registrationOtpVerfication = async (req, res) => {
 const editProfile = async (req, res) => {
     try {
 
-        const { _id, name, bike_mode, profile_image, phone } = req.body;
+        const { _id, name, bike_mode, phone } = req.body;
         if (!_id) {
             return res.status(200).json({ status: false, message: '_id is required' });
         }
         const user = await Users.findOne({ _id });
         if (!user) {
             return res.status(200).json({ status: false, message: 'User not found' });
-        }else{
+        } else {
 
-            user.name = name || user.name;
-            user.bike_mode = bike_mode || user.bike_mode;
-            user.phone = phone || user.phone;
-    
-            if (req.file) {
-                user.profile_image = req.file.filename;
+            const existingUsers = await Users.findOne({
+                $and: [
+                    { _id: { $ne: _id } }, // Exclude the current record
+                    { $or: [{ phone }] }
+                ]
+            });
+
+            if (existingUsers) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'email or phone no is already exist'
+                });
+            } else {
+                user.name = name || user.name;
+                user.bike_mode = bike_mode || user.bike_mode;
+                user.phone = phone || user.phone;
+
+                if (req.file) {
+                    delete_file('/uploads/users/' , user.profile_image)
+                    user.profile_image = req.file.filename;
+                }
+
+                const updatedUser = await user.save();
+                if (updatedUser) {
+                    res.status(200).json({ status: true, data: updatedUser, message: 'Profile updated successfully' });
+                } else {
+                    res.status(200).json({ status: false, message: 'Something went wrong!' });
+                }
+
             }
-    
-            const updatedUser = await user.save();
-    
-            res.status(200).json({ status: true, data: updatedUser, message: 'Profile updated successfully' });
         }
 
 
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({ status: false, message: error.message });
     }
 }
@@ -169,4 +192,4 @@ module.exports = {
     fetchProfile,
     registrationOtpVerfication,
     editProfile
-  };
+};

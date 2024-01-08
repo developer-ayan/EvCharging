@@ -12,7 +12,7 @@ const portSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
-    slots: {
+    unit_price: {
         type: String,
         required: true,
         trim: true,

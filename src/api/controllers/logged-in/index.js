@@ -16,16 +16,20 @@ const ObjectId = require('mongodb').ObjectId;
 
 const moment = require('moment')
 
+// date formate
 
-const dashboardStations =  async (req, res) => {
+const { DATE_FORMATE } = require('../../../utils/urls')
+
+
+const dashboardStations = async (req, res) => {
     try {
         const { latitude, longitude } = req.body;
 
         if (!latitude || !longitude) {
             return res.status(200).json({ status: false, message: 'latitude and longitude are required' });
         } else {
-            const radius = await StationradiusUsers.find({}).sort({ _id: -1 }).exec()
-            const set_radius = radius?.length > 0 ? Number(radius?.[0]?.toObject()?.radius) : 10
+            const radius = await StationradiusUsers.find({}).sort({ _id: -1 }).exec();
+            const set_radius = radius?.length > 0 ? Number(radius?.[0]?.toObject()?.radius) : 10;
 
             const result = await Station.aggregate([
                 {
@@ -56,6 +60,22 @@ const dashboardStations =  async (req, res) => {
                     },
                 },
                 {
+                    $lookup: {
+                        from: "ports",
+                        let: { stationId: { $toString: "$_id" } },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$station_id", "$$stationId"]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "ports"
+                    },
+                },
+                {
                     $unwind: {
                         path: "$rating",
                         preserveNullAndEmptyArrays: true // Include stations without ratings
@@ -65,11 +85,11 @@ const dashboardStations =  async (req, res) => {
                     $group: {
                         _id: "$_id",
                         station_name: { $first: "$station_name" },
-                        unit_price: { $first: "$unit_price" },
                         location: { $first: "$location" },
                         serial_no: { $first: "$serial_no" },
                         rating: { $avg: { $ifNull: [{ $toDouble: "$rating.rating" }, 0] } },
-                        distance: { $first: { $round: [{ $divide: ["$distance", 1000] }, 2] } }
+                        distance: { $first: { $round: [{ $divide: ["$distance", 1000] }, 2] } },
+                        ports: { $first: { $size: "$ports" } } // Get the count of ports
                     }
                 }
             ]);
@@ -77,10 +97,10 @@ const dashboardStations =  async (req, res) => {
             res.status(200).json({ status: true, data: result, message: 'Stations fetch successfully.' });
         }
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({ status: false, message: error.message });
     }
 }
+
 
 
 const stationDetail =  async (req, res) => {
@@ -142,7 +162,6 @@ const stationDetail =  async (req, res) => {
             })
         }
     } catch (error) {
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({ status: false, message: error.message });
     }
 }
@@ -165,7 +184,7 @@ const searchStation =  async (req, res) => {
 
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ status: false, message: 'Internal Server Error' });
+        return res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
 
@@ -186,7 +205,7 @@ const sendStationReview = async (req, res) => {
         }
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ status: false, message: 'Internal Server Error' });
+        return res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
 
@@ -331,7 +350,7 @@ const portSlots = async (req, res) => {
                 const endMoment = moment(resonse?.end_time, 'h:mm A');
 
                 if (!startMoment.isValid() || !endMoment.isValid()) {
-                    return res.status(400).json({ error: 'Invalid time format. Please use h:mm A format.' });
+                    return res.status(200).json({ error: 'Invalid time format. Please use h:mm A format.' });
                 } else {
                     const slots = generateSlots(startMoment, endMoment, false);
 
@@ -362,7 +381,6 @@ const portSlots = async (req, res) => {
         }
     } catch (error) {
         console.error('Error:', error);
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({ status: false, message: error.message });
     }
 }
@@ -376,9 +394,10 @@ const portSlotReservation = async (req, res) => {
         }
 
         // Fetch booking entries and station information in parallel
-        const [fetchBookingEntries, response] = await Promise.all([
+        const [fetchBookingEntries, response , port] = await Promise.all([
             Booking.find({ station_id, port_id, date: moment(new Date()).format(DATE_FORMATE) }),
-            Station.findOne({ _id: station_id })
+            Station.findOne({ _id: station_id }),
+            Port.findOne({ _id: port_id }),
         ]);
 
         if (response) {
@@ -421,7 +440,7 @@ const portSlotReservation = async (req, res) => {
                     });
 
                     const data = {
-                        total_amount: hourConvertIntoMinute(response.unit_price, start_time, end_time),
+                        total_amount: hourConvertIntoMinute(port?.unit_price || '0.00', start_time, end_time),
                     };
 
                     const statusMessage = isAnySlotBooked
@@ -462,7 +481,7 @@ const portSlotReservation = async (req, res) => {
                     });
 
                     const data = {
-                        total_amount: hourConvertIntoMinute(response.unit_price, start_time, end_time),
+                        total_amount: hourConvertIntoMinute(port?.unit_price, start_time, end_time),
                     };
 
                     const statusMessage = isAnySlotBooked
@@ -473,7 +492,7 @@ const portSlotReservation = async (req, res) => {
                 }
             } else {
                 const data = {
-                    total_amount: hourConvertIntoMinute(response.unit_price, start_time, end_time),
+                    total_amount: hourConvertIntoMinute(port.unit_price || '0.00', start_time, end_time),
                 };
                 res.status(200).json({ status: true, data, message: 'Reservation successfully.' });
             }
@@ -484,7 +503,6 @@ const portSlotReservation = async (req, res) => {
 
     } catch (error) {
         console.error('Error:', error);
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({ status: false, message: error.message });
     }
 }
@@ -585,8 +603,6 @@ const bookingPort =  async (req, res) => {
             }
         }
     } catch (error) {
-        console.error('Error:', error);
-        const status = error.name === 'ValidationError' ? 400 : 500;
         res.status(200).json({ status: false, message: error.message });
     }
 }
@@ -735,7 +751,7 @@ const bookingHistory =async (req, res) => {
        
     } catch (error) {
         console.error(error);
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
@@ -765,7 +781,7 @@ const stationQrCode =  async (req, res) => {
        
     } catch (error) {
         console.error(error);
-        res.status(500).json({
+        res.status(200).json({
             status: false,
             message: 'Internal Server Error'
         });
