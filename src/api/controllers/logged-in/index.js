@@ -593,12 +593,11 @@ const bookingPort =  async (req, res) => {
                 const findWallet = await Wallet.findOne({ user_id })
                 if(findWallet){
                     const wallet_balance = findWallet?.amount ?  Number(findWallet?.amount) : 0.00
-                     if( wallet_balance  >= Number(amount)){
-                     
+                     if( wallet_balance >= Number(amount)){
                             const wallet_balance =  (Number(findWallet?.amount) - Number(amount))
                             const updatedWallet = await Wallet.updateOne({ user_id }, { $set: { amount: wallet_balance } });
                             if(updatedWallet){
-                                const transaction = await Transaction.create({ user_id , amount ,credit_or_debit : 'DB' , })
+                                const transaction = await Transaction.create({ user_id , station_id , amount ,credit_or_debit : 'DB' , })
                                 if(transaction){
                                      const bookingSubmit = await Booking.create({ user_id, station_id, transaction_id : transaction?.transaction_id , port_id, amount, start_time, end_time, account_type , status : 'pending' })
                                     return res.status(200).json({ status: true,data : bookingSubmit, message: 'Booking submit successfully.' });
@@ -621,13 +620,13 @@ const bookingPort =  async (req, res) => {
                     const creditAmount = Number(findWallet.amount)  + Number(amount)
                     const updateResult = await Wallet.updateOne({ user_id }, { $set: { amount: creditAmount } });
                     if(updateResult){
-                        const transaction = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'CR' , })
+                        const transaction = await Transaction.create({ user_id,station_id, transaction_id , amount ,credit_or_debit : 'CR' , })
                         if(transaction){
                                  const findWallet = await Wallet.findOne({ user_id });
                                  const debitAmount = (Number(findWallet.amount) - Number(amount))
                                     const updateResult = await Wallet.updateOne({ user_id }, { $set: { amount: debitAmount } });
                                     if(updateResult){
-                                      const transactionDebit = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'DB' })
+                                      const transactionDebit = await Transaction.create({ user_id, station_id , transaction_id , amount ,credit_or_debit : 'DB' })
                                       if(transactionDebit){
                                         const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type , status : 'pending' })
                                         if(bookingSubmit){
@@ -650,12 +649,12 @@ const bookingPort =  async (req, res) => {
                 }else{
                     const credit = await Wallet.create({ user_id, account_type,transaction_id , amount })
                     if (credit) {
-                        const transaction = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'CR' , })
+                        const transaction = await Transaction.create({ user_id,station_id , transaction_id  , station_id, amount ,credit_or_debit : 'CR' , })
                         if(transaction){
                                  const debitAmount = (Number(credit.amount) - Number(amount))   
                                     const updateResult = await Wallet.updateOne({ user_id }, { $set: { amount: debitAmount } });
                                     if(updateResult){
-                                      const transactionDebit = await Transaction.create({ user_id, transaction_id , amount ,credit_or_debit : 'DB' })
+                                      const transactionDebit = await Transaction.create({ user_id, station_id , transaction_id , amount ,credit_or_debit : 'DB' })
                                       if(transactionDebit){
                                         const bookingSubmit = await Booking.create({ user_id, station_id, port_id, amount, start_time, end_time, transaction_id, account_type , status : 'pending' })
                                         if(bookingSubmit){
@@ -728,7 +727,38 @@ const transaction =  async (req, res) => {
  try {
     const {user_id} = req.body
     const findWallet = await Wallet.findOne({ user_id })
-    const findTransaction = await Transaction.find({ user_id }).sort({ _id: -1 }).exec()
+    const findTransaction = await Transaction.aggregate([
+        {
+            $match: {
+                user_id: user_id
+            }
+        },
+        {
+            $lookup: {
+              from: "stations",
+              let: { "stationId": "$station_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $eq: ["$_id", { "$toObjectId": "$$stationId" }],
+                    },
+                  },
+                },
+              ],
+              as: "station_detail",
+            }
+          },
+        {
+            $unwind: {
+                path: "$station_detail",
+                preserveNullAndEmptyArrays: true // Include stations without ratings
+            }
+        },
+        
+    ]).sort({ _id: -1 }).exec()
+      
+    console.log
     if(findTransaction.length > 0 && findWallet){
         const data = {
             balance :  findWallet?.amount || '0.00',

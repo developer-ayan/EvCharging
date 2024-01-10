@@ -23,6 +23,11 @@ const transactionSchema = new mongoose.Schema({
         trim: true,
         default: 0,
     },
+    station_id: {
+        type: String,
+        trim: true,
+        default: null,
+    },
     date: {
         type: String,
         trim: true,
