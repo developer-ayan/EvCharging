@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 
 const portSchema = new mongoose.Schema({
-
     station_id: {
         type: String,
         required: true,
@@ -13,6 +12,21 @@ const portSchema = new mongoose.Schema({
         trim: true,
     },
     unit_price: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    port_name: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    port_description: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+    port_image: {
         type: String,
         required: true,
         trim: true,

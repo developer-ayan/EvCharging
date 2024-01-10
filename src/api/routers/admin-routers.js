@@ -34,6 +34,7 @@ const {
 // Destination folder
 const destinationFolder = './uploads/station_images/';
 const countryFolder = './uploads/country_images/';
+const portFolder = './uploads/port_images/';
 
 // Create the destination folder if it doesn't exist
 
@@ -43,6 +44,10 @@ if (!fs.existsSync(countryFolder)) {
 
 if (!fs.existsSync(destinationFolder)) {
   fs.mkdirSync(destinationFolder, { recursive: true });
+}
+
+if (!fs.existsSync(portFolder)) {
+  fs.mkdirSync(portFolder, { recursive: true });
 }
 
 // Set storage engine
@@ -55,8 +60,19 @@ const storage = multer.diskStorage({
   }
 });
 
+// Set storage engine
+const storage_port = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, portFolder);
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
 const upload_single = multer({ storage }).single('profile_image');
 const upload_single_station = multer({ storage }).single('station_image');
+const upload_single_port = multer({ storage : storage_port }).single('port_image');
 
 // auth
 
@@ -80,8 +96,8 @@ router.post("/delete_station", upload, deleteStation);
 // station port
 
 router.post("/station_port_list", upload, stationPortList);
-router.post("/create_station_port", upload, createStationPort);
-router.post("/edit_station_port", upload, editStationPort);
+router.post("/create_station_port", upload_single_port, createStationPort);
+router.post("/edit_station_port", upload_single_port, editStationPort);
 router.post("/station_port_detail", upload, stationPortDetail);
 router.post("/delete_port", upload, deletePort);
 router.post("/station_reviews", upload, stationReviews);

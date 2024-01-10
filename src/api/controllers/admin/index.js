@@ -241,13 +241,16 @@ const stationList = async (req, res) => {
 }
 
 const createStationPort = async (req, res) => {
+    console.log('req.file' , req.file.filename)
     try {
         const {
             station_id,
             port_type,
-            unit_price
+            unit_price,
+            port_name,
+            port_description
         } = req.body;
-        if (!station_id || !port_type || !unit_price) {
+        if (!station_id || !port_type || !unit_price || !port_name || !port_description) {
             return res.status(200).json({
                 status: false,
                 message: 'All fields are required'
@@ -256,7 +259,10 @@ const createStationPort = async (req, res) => {
             await Port.create({
                 station_id,
                 port_type,
-                unit_price
+                unit_price,
+                port_name,
+                port_description,
+                port_image: req.file ? req.file.filename : null,
             });
             res.status(200).json({
                 status: true,
@@ -277,7 +283,9 @@ const editStationPort = async (req, res) => {
         const {
             _id,
             port_type,
-            unit_price
+            unit_price,
+            port_name,
+            port_description
         } = req.body;
         if (!_id) {
             return res.status(200).json({
@@ -296,11 +304,17 @@ const editStationPort = async (req, res) => {
         } else {
             port.port_type = port_type || port.port_type;
             port.unit_price = unit_price || port.unit_price;
+            port.port_name = port_name || port.port_name;
+            port.port_description = port_description || port.port_description;
+            if (req.file) {
+                delete_file('/uploads/port_images/' , port.port_image)
+                port.port_image = req.file.filename;
+            }
             const updatePort = await port.save();
             if (updatePort) {
                 res.status(200).json({
                     status: true,
-                    message: 'Station updated successfully'
+                    message: 'Port updated successfully'
                 });
             } else {
                 res.status(200).json({
