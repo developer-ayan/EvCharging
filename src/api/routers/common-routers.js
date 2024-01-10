@@ -33,7 +33,7 @@ if (!fs.existsSync(destinationFolder)) {
 // Set storage engine
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, destinationFolder);
+    cb(null, countryFolder);
   },
   filename: (req, file, cb) => {
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));

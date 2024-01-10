@@ -10,6 +10,8 @@ const port = process.env.PORT || 3001;
 app.use(express.json());
 app.use('/uploads/station_images', express.static('uploads/station_images'));
 app.use('/uploads/users', express.static('uploads/users'));
+app.use('/uploads/port_images', express.static('uploads/port_images'));
+app.use('/uploads/country_images', express.static('uploads/country_images'));
 
 const authRoutes = require('./src/api/routers/auth-routers');
 const loggedInRoutes = require('./src/api/routers/logged-in-routers');
