@@ -87,6 +87,7 @@ const dashboardStations = async (req, res) => {
                         station_name: { $first: "$station_name" },
                         location: { $first: "$location" },
                         serial_no: { $first: "$serial_no" },
+                        station_image: { $first: "$station_image" },
                         rating: { $avg: { $ifNull: [{ $toDouble: "$rating.rating" }, 0] } },
                         distance: { $first: { $round: [{ $divide: ["$distance", 1000] }, 2] } },
                         ports: { $first: { $size: "$ports" } } // Get the count of ports
@@ -166,17 +167,92 @@ const stationDetail =  async (req, res) => {
     }
 }
 
-
 const searchStation =  async (req, res) => {
     try {
-        const { search } = req.body;
+        const { search , latitude , longitude } = req.body;
         if (!search) {
             return res.status(200).json({ status: true, data: [], message: 'Stations fetched successfully.' });
         } else {
             const regex = new RegExp(search, 'i');
-            const stations = await Station.find({ station_name: { $regex: regex } }).sort({ _id: -1 }).exec();
-            if (stations.length > 0) {
-                return res.status(200).json({ status: true, data: stations, message: 'Stations fetched successfully.' });
+            const stations = await Station.aggregate([
+                {
+                    $match: {
+                        station_name: { $regex: regex }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "station_reviews",
+                        let: { stationId: { $toString: "$_id" } },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$station_id", "$$stationId"]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "station_reviews"
+                    },
+                },
+                {
+                    $unwind: {
+                        path: "$station_reviews",
+                        preserveNullAndEmptyArrays: true // Include stations without reviews
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "ports",
+                        let: { stationId: { $toString: "$_id" } },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$station_id", "$$stationId"]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "ports"
+                    },
+                },
+                {
+                    $group: {
+                        _id: "$_id", // Group by station id
+                        rating: { $avg: { $ifNull: [{ $toDouble: "$station_reviews.rating" }, 0] } },
+                        stationData: { $first: "$$ROOT" }, // Retain the entire station document
+                        ports: { $first: { $size: "$ports" } } // Get the count of ports
+                    }
+                },
+                {
+                    $addFields: {
+                        "stationData.rating": "$rating",// Add averageRating to stationData
+                        "stationData.ports": "$ports",// Add averageRating to stationData
+                    },
+                },
+                {
+                    $replaceRoot: { newRoot: "$stationData"  } // Replace the root document with stationData
+                },
+                {
+                    $project: {
+                        station_reviews: 0 // Exclude the station_reviews array from the result
+                    }
+                }
+            ]).sort({ _id: -1 }).exec();
+
+            const modified_stations = stations.map((item , index) => {
+                const lat = item.location?.coordinates[1] || 0;
+                const lng = item.location?.coordinates[0] || 0;
+                return {
+                    ...item,
+                     distance : calculateDistance(latitude, longitude, lat, lng)
+                }
+            })
+            
+            if (modified_stations.length > 0) {
+                return res.status(200).json({ status: true, data: modified_stations, message: 'Stations fetched successfully.' });
             } else {
                 return res.status(200).json({ status: false, message: 'Stations not found!' });
             }
@@ -685,7 +761,7 @@ const transactionSuccessfully =async (req, res) => {
                     const data = {
                         station_detail,
                         port_detail,
-                        unit_price: hourConvertIntoMinute(station_detail.unit_price, start_time, end_time),
+                        unit_price: hourConvertIntoMinute(port_detail.unit_price, start_time, end_time),
                         transaction_id : booking_detail?.transaction_id
                     };
 
@@ -738,10 +814,6 @@ const bookingHistory =async (req, res) => {
                 },
             ]);
             
-            console.log(JSON.stringify(bookinghistory, null, 2));
-            
-            
-
             res.status(200).json({
                 status: true,
                 data: bookinghistory,
@@ -807,16 +879,16 @@ function hourConvertIntoMinute(per_min_unit, start_time, end_time) {
     const endTime = moment(end_time, 'h:mm A');
 
     // Calculate the time difference in minutes
-    const timeDifferenceInMinutes = endTime.diff(startTime, 'hours');
+    const timeDifferenceInMinutes = endTime.diff(startTime, 'minutes');
 
     // Ensure the time difference is non-negative
     const validTimeDifference = Math.max(timeDifferenceInMinutes, 0);
 
     // Calculate the cost
-    const cost = validTimeDifference * per_min_unit;
+    const cost = (validTimeDifference / 60) * per_min_unit; // Convert minutes to hours
 
     return cost;
-}
+} 
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371; // Radius of the Earth in kilometers
