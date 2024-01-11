@@ -134,12 +134,59 @@ const stationDetail =  async (req, res) => {
 
             await Promise.all([
                 Station.findOne({ _id }),
-                Port.find({ station_id: _id }).sort({ _id: -1 }).exec(),
+                Port.aggregate([
+                    {
+                        $lookup: {
+                            from: "bookings",
+                            let: { portId: { $toString: "$_id" } },
+                            pipeline: [
+                                {
+                                    $match: {
+                                        $expr: {
+                                            $eq: ["$port_id", "$$portId"]
+                                        }
+                                    }
+                                }
+                            ],
+                            as: "bookings"
+                        },
+                    },
+                ]).sort({ _id: -1 }).exec(),
             ]).then((resonse) => {
                 if (resonse[0]) {
+                    const startMoment = moment(resonse[0].start_time, 'h:mm A');
+                    const endMoment = moment(resonse[0].end_time, 'h:mm A');
+                    const slots = generateSlots(startMoment, endMoment, false);
+
+                    
+                    const currentTime = moment(); // Get the current time
+                    const currentMoment = moment(currentTime, 'h:mm A');
+                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
 
                     const myLat = latitude
                     const myLng = longitude
+
+                    const port_detail_modified = resonse[1].map((item, index) => {
+                        const uniqueSlotsCount = removeDuplicatesAndFilter(item.bookings.flatMap(bookingItem => {
+                            const startMoment = moment(bookingItem.start_time, 'h:mm A');
+                            const endMoment = moment(bookingItem.end_time, 'h:mm A');
+                            return [...slots, ...generateSlots(startMoment, endMoment, false)];
+                        }) , currentTime).length;
+                    
+                        return {
+                            ...item,
+                            available_slots: uniqueSlotsCount > 0 ? uniqueSlotsCount : (filteredSlots?.length || 0),
+                        };
+                    });
+
+                    // Create a new array without modifying the original bookings array
+                const new_port_modified = port_detail_modified.map(({ bookings, ...rest }) => ({
+                        ...rest,
+                    // If you don't want to include the modified bookings array in the result, omit it
+                }));
+                    
+
+
 
                     const lat = resonse[0]?.location?.coordinates[1] || 0
                     const lng = resonse[0]?.location?.coordinates[0] || 0
@@ -152,13 +199,14 @@ const stationDetail =  async (req, res) => {
                             rating: stationRating?.length > 0 ? stationRating?.[0]?.avg : 0,
                             distance: distanceInKm ? distanceInKm?.toFixed(2) : '0'
                         },
-                        port_list: resonse[1]
+                        port_list: new_port_modified
                     }
                     res.status(200).json({ status: true, data, message: 'Station detail fetch successfully.' });
                 } else {
                     res.status(200).json({ status: false, message: 'Station not found!' });
                 }
-            }).catch(() => {
+            }).catch((e) => {
+                console.log('error => ' , e.message)
                 res.status(200).json({ status: false, message: 'something went wrong.' });
             })
         }
@@ -346,6 +394,8 @@ const portSlots = async (req, res) => {
 
                     // const fetch_start_and_end_time = [{start_time : '2:00 PM' , end_time : "5:00 PM"}]
                     const currentTime = moment(); // Get the current time
+                    const currentMoment = moment(currentTime, 'h:mm A');
+
 
                     fetch_start_and_end_time.forEach(({ start_time, end_time }) => {
                         // Convert start_time and end_time to moment objects for easier comparison
@@ -366,7 +416,6 @@ const portSlots = async (req, res) => {
                         }
                     });
 
-                    const currentMoment = moment(currentTime, 'h:mm A');
 
                     // Filter the slots based on the current time
                     const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
@@ -890,6 +939,26 @@ const stationQrCode =  async (req, res) => {
     }
 }
 
+function removeDuplicatesAndFilter(array, currentTime) {
+    const timeOccurrences = new Map();
+
+    // Count occurrences of each time
+    array.forEach(obj => {
+        const { time } = obj;
+        const key = time;
+        const count = timeOccurrences.get(key) || 0;
+        timeOccurrences.set(key, count + 1);
+    });
+
+    // Filter objects based on occurrences and greater than current time
+    const uniqueObjects = array.filter(obj => {
+        const { time } = obj;
+        const key = time;
+        return timeOccurrences.get(key) === 1 && moment(time, 'h:mm A').isAfter(moment(currentTime, 'h:mm A'));
+    });
+
+    return uniqueObjects;
+}
 
 function generateSlots(startMoment, endMoment, isBooked) {
     const slots = [];

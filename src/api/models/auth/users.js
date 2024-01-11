@@ -10,6 +10,10 @@ const registerSchema = new mongoose.Schema({
         unique: true,
         trim: true,
     },
+    country_code_id: {
+        type: String,
+        trim: true,
+    },
     email: {
         type: String,
         unique: true,

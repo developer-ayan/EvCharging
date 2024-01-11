@@ -10,24 +10,21 @@ const {
   editCountryCode,
   fetchCountryCodes,
   fetchCountryCodeDetail,
+  deleteCountryCode,
   createVehicleMode,
   editVehicleMode,
   fetchVehicles,
-  fetchVehicleDetail
+  fetchVehicleDetail,
+  deleteVehicle
 } = require('../controllers/admin');
 
 // Destination folder
-const destinationFolder = './uploads/station_images/';
 const countryFolder = './uploads/country_images/';
 
 // Create the destination folder if it doesn't exist
 
 if (!fs.existsSync(countryFolder)) {
   fs.mkdirSync(countryFolder, { recursive: true });
-}
-
-if (!fs.existsSync(destinationFolder)) {
-  fs.mkdirSync(destinationFolder, { recursive: true });
 }
 
 // Set storage engine
@@ -47,11 +44,13 @@ router.post("/create_country_code", upload_single_country_image, createCountryCo
 router.post("/edit_country_code", upload_single_country_image, editCountryCode);
 router.post("/fetch_country_code", upload, fetchCountryCodes);
 router.post("/fetch_country_code_detail", upload, fetchCountryCodeDetail);
+router.post("/delete_country_code", upload, deleteCountryCode);
 
 // Vehicles
 router.post("/create_vehicle", upload, createVehicleMode);
 router.post("/edit_vehicle", upload, editVehicleMode);
 router.post("/fetch_vehicles", upload, fetchVehicles);
 router.post("/fetch_vehicle_detail", upload, fetchVehicleDetail);
+router.post("/delete_vehicle", upload, deleteVehicle);
 
 module.exports = router;

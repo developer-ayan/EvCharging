@@ -842,6 +842,7 @@ const userEditDetail = async (req, res) => {
 
 const createCountryCode = async (req, res) => {
     try {
+        console.log('req.file.filename' , req.file.filename)
         const { country_code, country_name, country_short_name } = req.body;
 
         // Check for missing fields
@@ -1004,6 +1005,41 @@ const fetchCountryCodeDetail = async (req, res) => {
     }
 }
 
+const deleteCountryCode = async (req, res) => {
+    try {
+
+        const {
+            _id
+        } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const deletedCountryCode = await CountryCode.findByIdAndDelete(_id);
+
+        if(deletedCountryCode){
+            res.status(200).json({
+                status: true,
+                message: 'Country code delete successfully.'
+            });
+        }else{
+            res.status(200).json({
+                status: false,
+                message: 'Somthing went wrong!'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
 const createVehicleMode = async (req, res) => {
     try {
         const { vehicle_name, model_no } = req.body;
@@ -1140,6 +1176,41 @@ const fetchVehicleDetail = async (req, res) => {
     }
 }
 
+const deleteVehicle = async (req, res) => {
+    try {
+
+        const {
+            _id
+        } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const deletedVehicle = await Vehicles.findByIdAndDelete(_id);
+
+        if(deletedVehicle){
+            res.status(200).json({
+                status: true,
+                message: 'Vehicle delete successfully.'
+            });
+        }else{
+            res.status(200).json({
+                status: false,
+                message: 'Somthing went wrong!'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
 module.exports = {
     login,
     createStation,
@@ -1167,8 +1238,10 @@ module.exports = {
     editCountryCode,
     fetchCountryCodes,
     fetchCountryCodeDetail,
+    deleteCountryCode,
     createVehicleMode,
     editVehicleMode,
     fetchVehicles,
-    fetchVehicleDetail
+    fetchVehicleDetail,
+    deleteVehicle
 };

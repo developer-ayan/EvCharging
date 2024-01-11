@@ -15,7 +15,7 @@ const { delete_file } = require('../../../utils/helpers');
 
 const register = async (req, res) => {
     try {
-        const { name, phone, email, social_id } = req.body;
+        const { name, phone, email, country_code_id } = req.body;
 
         if (!name || !phone) {
             return res.status(200).json({ status: false, message: 'All fields are required' });
@@ -29,7 +29,7 @@ const register = async (req, res) => {
         } else if (existingEmailUser) {
             return res.status(200).json({ status: false, message: 'Email already exists' });
         } else {
-            const user = await Users.create({ name, phone, email });
+            const user = await Users.create({ name, country_code_id, phone, email });
             // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
             res.status(200).json({ status: true, data: user, message: 'User registered successfully' });
         }
@@ -81,17 +81,22 @@ const socialLogin = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const { country_code_id , phone } = req.body;
         const randomFourDigitNumber = Math.floor(Math.random() * 9000) + 1000;
-        const user = await Users.findOne({ phone });
 
-        if (!user) {
-            return res.status(200).json({ status: false, message: 'User not found' });
-        } else {
-            if (user?.status == 'active') {
-                res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+        if(!country_code_id|| !phone){
+            res.status(200).json({ status: false, message: 'country_code_id and phone is required' });
+        }else{   
+            const user = await Users.findOne({ country_code_id , phone });
+            
+            if (!user) {
+                return res.status(200).json({ status: false, message: 'User not found' });
             } else {
-                res.status(200).json({ status: false, message: 'Your account has been suspended' });
+                if (user?.status == 'active') {
+                    res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+                } else {
+                    res.status(200).json({ status: false, message: 'Your account has been suspended' });
+                }
             }
         }
     } catch (error) {
@@ -137,7 +142,7 @@ const registrationOtpVerfication = async (req, res) => {
 const editProfile = async (req, res) => {
     try {
 
-        const { _id, name, bike_mode, phone } = req.body;
+        const { _id, name, bike_mode, phone , country_code_id } = req.body;
         if (!_id) {
             return res.status(200).json({ status: false, message: '_id is required' });
         }
@@ -162,6 +167,7 @@ const editProfile = async (req, res) => {
                 user.name = name || user.name;
                 user.bike_mode = bike_mode || user.bike_mode;
                 user.phone = phone || user.phone;
+                user.country_code_id = country_code_id || user.country_code_id;
 
                 if (req.file) {
                     delete_file('/uploads/users/' , user.profile_image)
