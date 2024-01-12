@@ -35,10 +35,11 @@ const {
     fetchProfile,
     registrationOtpVerfication,
     editProfile
-} = require('../controllers/auth')
+} = require('../controllers/auth');
 
-// auth
+const { deleteUser } = require('../controllers/admin');
 
+// Auth
 router.post("/login", upload, login);
 router.post("/register", upload, register);
 router.post("/registration_otp_verfication", upload, registrationOtpVerfication);
@@ -46,5 +47,6 @@ router.post("/social_login", upload, socialLogin);
 router.post("/register_social_account", upload, registerSocialAccount);
 router.post("/fetch_profile", upload, fetchProfile);
 router.post("/edit_profile", AuthMiddleware, upload_single, editProfile);
+router.post("/delete_user", upload, deleteUser);
 
 module.exports = router;

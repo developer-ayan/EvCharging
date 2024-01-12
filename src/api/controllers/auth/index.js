@@ -21,13 +21,24 @@ const register = async (req, res) => {
             return res.status(200).json({ status: false, message: 'All fields are required' });
         }
 
-        const existingPhoneUser = await Users.findOne({ phone });
+        const existingPhoneUser = await Users.findOne({ country_code_id, phone });
         const existingEmailUser = await Users.findOne({ email });
-
         if (existingPhoneUser) {
-            return res.status(200).json({ status: false, message: 'Phone number already exists' });
+            if(existingPhoneUser?.status == 'delete'){
+                return res.status(200).json({ status: false, message: 'Your account has been deleted on this number. Please create an account using a different number.' });
+            } else if(existingPhoneUser?.status == 'suspend'){
+                return res.status(200).json({ status: false, message: 'Your account has been suspended on this number. Please contact our team for assistance.' });
+            } else{
+                return res.status(200).json({ status: false, message: 'Phone number already exists' });
+            }
         } else if (existingEmailUser) {
-            return res.status(200).json({ status: false, message: 'Email already exists' });
+            if(existingEmailUser?.status == 'delete'){
+                return res.status(200).json({ status: false, message: 'Your account has been deleted on this email. Please create an account using a different number.' });
+            }  else if(existingPhoneUser?.status == 'suspend'){
+                return res.status(200).json({ status: false, message: 'Your account has been suspended on this number. Please contact our team for assistance.' });
+            } else{
+                return res.status(200).json({ status: false, message: 'Email already exists' });
+            }
         } else {
             const user = await Users.create({ name, country_code_id, phone, email });
             // const token = jwt.sign({ userId: user._id }, tokenSecretKey, { expiresIn: '1h' });
@@ -49,7 +60,13 @@ const registerSocialAccount = async (req, res) => {
             const user = await Users.findOne({ social_id });
 
             if (user) {
-                return res.status(200).json({ status: false, message: 'This account already registered.' });
+                if(user?.status == 'delete'){
+                    return res.status(200).json({ status: false, message: 'Your account has been deleted on this id. Please create an account using a different social id.' });
+                } else if(user?.status == 'suspend'){
+                    return res.status(200).json({ status: false, message: 'Your account has been suspended on this number. Please contact our team for assistance.' });
+                } else{
+                    return res.status(200).json({ status: false, message: 'This account already registered.' });
+                }
             } else {
                 const user = await Users.create({ name, phone, email, social_id });
                 return res.status(200).json({ status: true, data: user, message: 'User registered successfully' });
@@ -69,6 +86,11 @@ const socialLogin = async (req, res) => {
         } else {
             const user = await Users.findOne({ social_id });
             if (user) {
+                if(user?.status == 'delete'){
+                    return res.status(200).json({ status: false, message: 'Your account has been deleted on this id. Please create an account using a different social id.' });
+                } else if(user?.status == 'suspend'){
+                    return res.status(200).json({ status: false, message: 'Your account has been suspended on this number. Please contact our team for assistance.' });
+                }
                 return res.status(200).json({ status: true, data: user, message: 'Login successfully.' });
             } else {
                 res.status(200).json({ status: false, message: 'User not found!' });
@@ -94,6 +116,8 @@ const login = async (req, res) => {
             } else {
                 if (user?.status == 'active') {
                     res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+                }else if (user?.status == 'delete') {
+                    res.status(200).json({ status: false, message: 'Your account has been deleted.' });
                 } else {
                     res.status(200).json({ status: false, message: 'Your account has been suspended' });
                 }

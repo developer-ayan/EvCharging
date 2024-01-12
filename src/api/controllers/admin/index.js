@@ -8,6 +8,7 @@ const Users = require('../../models/auth/users');
 const CountryCode = require('../../models/admin/country-code')
 const Stations = require('../../models/admin/create-station')
 const Vehicles = require('../../models/admin/vehicle')
+const PrivacyPolicy = require('../../models/admin/privacy-policy')
 
 // object id
 const ObjectId = require('mongodb').ObjectId;
@@ -1127,7 +1128,7 @@ const editVehicleMode = async (req, res) => {
             }
         }
     } catch (error) {
-        res.status(status).json({
+        res.status(200).json({
             status: false,
             message: error.message
         });
@@ -1211,6 +1212,197 @@ const deleteVehicle = async (req, res) => {
     }
 }
 
+const createPrivacyPolicy = async (req, res) => {
+    try {
+        const { html } = req.body;
+
+        // Check for missing fields
+        if (!html) {
+            return res.status(200).json({
+                status: false,
+                message: 'HTML is required'
+            });
+        } else {
+            // Check if country code, country name, or country short name already exist
+            const existingPrivacyPolicy = await PrivacyPolicy.find({});
+
+            if (existingPrivacyPolicy.length > 0) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'Privacy policy is already exist'
+                });
+            } else {
+                // Create country code
+                const privacyPolicyCreate = await PrivacyPolicy.create({ html });
+                // Check if the creation was successful
+                if (privacyPolicyCreate) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Privacy policy created successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Failed to privacy policy'
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+};
+
+const editPrivacyPolicy = async (req, res) => {
+    try {
+        const { _id, html } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const findPrivacyPolicy = await PrivacyPolicy.findOne({
+            _id
+        });
+
+        if (!findPrivacyPolicy) {
+            return res.status(200).json({
+                status: false,
+                message: 'Privacy policy not found'
+            });
+        } else {
+            findPrivacyPolicy.html = html || findPrivacyPolicy.html;
+
+            const updatedVehicle = await findPrivacyPolicy.save();
+
+            if (updatedVehicle) {
+                res.status(200).json({
+                    status: true,
+                    message: 'Privacy policy updated successfully'
+                });
+            } else {
+                res.status(200).json({
+                    status: false,
+                    message: 'Something went wrong!'
+                });
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+};
+
+const fetchPrivacyPolicy = async (req, res) => {
+    try {
+            const findPrivacyPolicy = await PrivacyPolicy.find({  }).sort({ _id: -1 }).exec()
+            if(findPrivacyPolicy.length > 0){
+                res.status(200).json({
+                    status: true,
+                    data: findPrivacyPolicy?.[0],
+                    message: 'Privacy policy fetch successfully.'
+                });
+            }else{
+                res.status(200).json({
+                    status: false,
+                    message: 'Privacy policy not found!'
+                });
+            }
+         
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const deletePrivacyPolicy = async (req, res) => {
+    try {
+
+        const {
+            _id
+        } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const deleted = await PrivacyPolicy.findByIdAndDelete(_id);
+
+        if(deleted){
+            res.status(200).json({
+                status: true,
+                message: 'Privacy policy delete successfully.'
+            });
+        }else{
+            res.status(200).json({
+                status: false,
+                message: 'Somthing went wrong!'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const deleteUser = async (req, res) => {
+    try {
+
+        const { _id } = req.body;
+        if (!_id) {
+            return res.status(200).json({ status: false, message: '_id is required' });
+        }
+        const user = await Users.findOne({ _id });
+        if (!user) {
+            return res.status(200).json({ status: false, message: 'User not found' });
+        } else {
+
+            const existingUsers = await Users.findOne({_id});
+
+            if (existingUsers) {
+                user.name = user.name;
+                user.bike_mode = user.bike_mode;
+                user.phone =  user.phone;
+                user.country_code_id = user.country_code_id;
+                user.profile_image = user.profile_image;
+                user.status = 'delete';
+
+                const updatedUser = await user.save();
+                if (updatedUser) {
+                    res.status(200).json({ status: true, message: 'Account has been deleted' });
+                } else {
+                    res.status(200).json({ status: false, message: 'Something went wrong!' });
+                }
+              
+            } else {
+                return res.status(200).json({
+                    status: false,
+                    message: 'email or phone no is already exist'
+                });
+            }
+        }
+
+
+    } catch (error) {
+        res.status(200).json({ status: false, message: error.message });
+    }
+}
+
 module.exports = {
     login,
     createStation,
@@ -1243,5 +1435,10 @@ module.exports = {
     editVehicleMode,
     fetchVehicles,
     fetchVehicleDetail,
-    deleteVehicle
+    deleteVehicle,
+    createPrivacyPolicy,
+    editPrivacyPolicy,
+    fetchPrivacyPolicy,
+    deletePrivacyPolicy,
+    deleteUser
 };

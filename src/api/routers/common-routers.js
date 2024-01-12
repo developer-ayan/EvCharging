@@ -15,7 +15,12 @@ const {
   editVehicleMode,
   fetchVehicles,
   fetchVehicleDetail,
-  deleteVehicle
+  deleteVehicle,
+  createPrivacyPolicy,
+  editPrivacyPolicy,
+  fetchPrivacyPolicy,
+  deletePrivacyPolicy,
+  deleteUser
 } = require('../controllers/admin');
 
 // Destination folder
@@ -52,5 +57,11 @@ router.post("/edit_vehicle", upload, editVehicleMode);
 router.post("/fetch_vehicles", upload, fetchVehicles);
 router.post("/fetch_vehicle_detail", upload, fetchVehicleDetail);
 router.post("/delete_vehicle", upload, deleteVehicle);
+
+// Privacy policy
+router.post("/create_privacy_policy", upload, createPrivacyPolicy);
+router.post("/edit_privacy_policy", upload, editPrivacyPolicy);
+router.post("/fetch_privacy_policy", upload, fetchPrivacyPolicy);
+router.post("/delete_privacy_policy", upload, deletePrivacyPolicy);
 
 module.exports = router;
