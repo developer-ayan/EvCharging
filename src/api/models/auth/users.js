@@ -34,6 +34,11 @@ const registerSchema = new mongoose.Schema({
         default: null, // Set the default value here
         trim: true,
     },
+    notification_token: {
+        type: String,
+        default: null, // Set the default value here
+        trim: true,
+    },
     profile_image: {
         type: String,
         default: null, // Set the default value here

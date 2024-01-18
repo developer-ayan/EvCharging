@@ -52,7 +52,7 @@ const register = async (req, res) => {
 
 const registerSocialAccount = async (req, res) => {
     try {
-        const { social_id, country_code_id , name, phone, email } = req.body;
+        const { social_id, country_code_id , name, phone, email , notification_token } = req.body;
 
         if (!social_id) {
             return res.status(200).json({ status: false, message: 'social_id is required' });
@@ -75,7 +75,7 @@ const registerSocialAccount = async (req, res) => {
                 }else if(existingEmailUser){
                     return res.status(200).json({ status: false, message: 'Email already exists' });
                 }else{
-                    const user = await Users.create({ name, phone, email, social_id });
+                    const user = await Users.create({ name, phone, email, social_id ,notification_token });
                     return res.status(200).json({ status: true, data: user, message: 'User registered successfully' });
                 }
             }
@@ -87,7 +87,7 @@ const registerSocialAccount = async (req, res) => {
 
 const socialLogin = async (req, res) => {
     try {
-        const { social_id } = req.body;
+        const { social_id  , notification_token} = req.body;
 
         if (!social_id) {
             return res.status(200).json({ status: false, message: 'social_id is required' });
@@ -98,8 +98,14 @@ const socialLogin = async (req, res) => {
                     return res.status(200).json({ status: false, message: 'Your account has been deleted on this id. Please create an account using a different social id.' });
                 } else if(user?.status == 'suspend'){
                     return res.status(200).json({ status: false, message: 'Your account has been suspended on this number. Please contact our team for assistance.' });
+                }else{
+                    const user_update = await Users.findOneAndUpdate(
+                        { _id: new ObjectId(user?._id) },
+                        { $set: { notification_token: notification_token } },
+                        { new: true } // Return the modified document
+                    );
+                    return res.status(200).json({ status: true, data: user_update, message: 'Login successfully.' });
                 }
-                return res.status(200).json({ status: true, data: user, message: 'Login successfully.' });
             } else {
                 res.status(200).json({ status: false, message: 'User not found!' });
             }
@@ -111,7 +117,7 @@ const socialLogin = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { country_code_id , phone } = req.body;
+        const { country_code_id , phone , notification_token } = req.body;
         const randomFourDigitNumber = Math.floor(Math.random() * 9000) + 1000;
 
         if(!country_code_id|| !phone){
@@ -123,7 +129,12 @@ const login = async (req, res) => {
                 return res.status(200).json({ status: false, message: 'User not found' });
             } else {
                 if (user?.status == 'active') {
-                    res.status(200).json({ status: true, data: user, OTP: randomFourDigitNumber, message: 'Login successfully.' });
+                    const user_update = await Users.findOneAndUpdate(
+                        { _id: new ObjectId(user?._id) },
+                        { $set: { notification_token: notification_token } },
+                        { new: true } // Return the modified document
+                    );
+                    res.status(200).json({ status: true, data: user_update, OTP: randomFourDigitNumber, message: 'Login successfully.' });
                 }else if (user?.status == 'delete') {
                     res.status(200).json({ status: false, message: 'Your account has been deleted.' });
                 } else {
@@ -132,6 +143,7 @@ const login = async (req, res) => {
             }
         }
     } catch (error) {
+        console.log(error)
         res.status(200).json({ status: false, message: 'Internal Server Error' });
     }
 }
