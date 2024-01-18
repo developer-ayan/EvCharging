@@ -29,6 +29,7 @@ const {
   users,
   userFetchDetail,
   userEditDetail,
+  cancelBooking,
 } = require('../controllers/admin');
 
 // Destination folder
@@ -113,5 +114,8 @@ router.post("/fetch_radius", upload, fetchRadius);
 router.post("/users", users);
 router.post("/user_fetch_profile", upload, userFetchDetail);
 router.post("/edit_user_detail", upload_single, userEditDetail);
+
+// booking
+router.post("/cancel_booking", upload_single, cancelBooking);
 
 module.exports = router;

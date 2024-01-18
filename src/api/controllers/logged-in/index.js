@@ -350,6 +350,7 @@ const portSlots = async (req, res) => {
         const fetchBookingEntries = await Booking.find({ station_id, port_id, date: moment(new Date()).format(DATE_FORMATE) });
 
         if (fetchBookingEntries.length > 0) {
+
             const fetch_start_and_end_time = fetchBookingEntries?.map((item, index) => {
                 return { start_time: item.start_time, end_time: item.end_time, }
             })
@@ -361,7 +362,7 @@ const portSlots = async (req, res) => {
                     $group: {
                         _id: '$station_id',
                         count: { $sum: 1 },
-                        avg: { $avg: { $toInt: '$rating' } } // Convert 'rating' to integer for averaging
+                        avg: { $avg: { $toDouble: '$rating' } } // Convert 'rating' to double for averaging
                     }
                 },
                 {
@@ -450,7 +451,7 @@ const portSlots = async (req, res) => {
                     $group: {
                         _id: '$station_id',
                         count: { $sum: 1 },
-                        avg: { $avg: { $toInt: '$rating' } } // Convert 'rating' to integer for averaging
+                        avg: { $avg: { $toDouble: '$rating' } } // Convert 'rating' to double for averaging
                     }
                 },
                 {
@@ -561,14 +562,21 @@ const portSlotReservation = async (req, res) => {
                         });
                     }));
 
+
+                    
                     const isAnySlotBooked = slots.some(slot => {
                         const slotTime = moment(slot.time, 'h:mm A');
-                        const startTime = moment(start_time, 'h:mm A');
-                        const endTime = moment(end_time, 'h:mm A');
-
-                        return slotTime.isBetween(startTime, endTime, null, '[]') && slot.isBooked;
+                        
+                        // Iterate through each minute within the specified time range
+                        for (let currentTime = moment(start_time, 'h:mm A'); currentTime.isBefore(moment(end_time, 'h:mm A')); currentTime.add(1, 'minutes')) {
+                            // Check if the slot is booked at the current minute
+                            if (slotTime.isSame(currentTime, 'minute') && slot.isBooked) {
+                                return true; // Booked slot found at the current minute
+                            }
+                        }
+                    
+                        return false; // No booked slots found within the specified time range
                     });
-
                     const data = {
                         total_amount: hourConvertIntoMinute(port?.unit_price || '0.00', start_time, end_time),
                     };
@@ -602,12 +610,19 @@ const portSlotReservation = async (req, res) => {
                         });
                     }));
 
+
                     const isAnySlotBooked = slots.some(slot => {
                         const slotTime = moment(slot.time, 'h:mm A');
-                        const startTime = moment(start_time, 'h:mm A');
-                        const endTime = moment(end_time, 'h:mm A');
-
-                        return slotTime.isBetween(startTime, endTime, null, '[]') && slot.isBooked;
+                        
+                        // Iterate through each minute within the specified time range
+                        for (let currentTime = moment(start_time, 'h:mm A'); currentTime.isBefore(moment(end_time, 'h:mm A')); currentTime.add(1, 'minutes')) {
+                            // Check if the slot is booked at the current minute
+                            if (slotTime.isSame(currentTime, 'minute') && slot.isBooked) {
+                                return true; // Booked slot found at the current minute
+                            }
+                        }
+                    
+                        return false; // No booked slots found within the specified time range
                     });
 
                     const data = {

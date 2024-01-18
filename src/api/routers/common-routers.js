@@ -20,7 +20,14 @@ const {
   editPrivacyPolicy,
   fetchPrivacyPolicy,
   deletePrivacyPolicy,
-  deleteUser
+  createTermsAndConditions,
+  editTermsAndConditions,
+  fetchTermsAndConditions,
+  deleteTermsAndConditions,
+  createFaqs,
+  editFaqs,
+  fetchFaqs,
+  deleteFaqs,
 } = require('../controllers/admin');
 
 // Destination folder
@@ -63,5 +70,17 @@ router.post("/create_privacy_policy", upload, createPrivacyPolicy);
 router.post("/edit_privacy_policy", upload, editPrivacyPolicy);
 router.post("/fetch_privacy_policy", upload, fetchPrivacyPolicy);
 router.post("/delete_privacy_policy", upload, deletePrivacyPolicy);
+
+// Terms and conditions
+router.post("/create_terms_and_conditions", upload, createTermsAndConditions);
+router.post("/edit_terms_and_conditions", upload, editTermsAndConditions);
+router.post("/fetch_terms_and_conditions", upload, fetchTermsAndConditions);
+router.post("/delete_terms_and_conditions", upload, deleteTermsAndConditions);
+
+// Faqs
+router.post("/create_faqs", upload, createFaqs);
+router.post("/edit_faqs", upload, editFaqs);
+router.post("/fetch_faqs", upload, fetchFaqs);
+router.post("/delete_faqs", upload, deleteFaqs);
 
 module.exports = router;

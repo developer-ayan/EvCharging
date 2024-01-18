@@ -9,15 +9,21 @@ const CountryCode = require('../../models/admin/country-code')
 const Stations = require('../../models/admin/create-station')
 const Vehicles = require('../../models/admin/vehicle')
 const PrivacyPolicy = require('../../models/admin/privacy-policy')
+const TermsAndConditions = require('../../models/admin/terms-and-conditions')
+const Faqs = require('../../models/admin/faqs')
 
 // object id
 const ObjectId = require('mongodb').ObjectId;
 
 // moment
 const moment = require('moment')
+const mongoose = require('mongoose')
 
 // helper functions
 const { delete_file } = require('../../../utils/helpers')
+const Booking = require('../../models/logged-in/booking')
+const Wallet = require('../../models/logged-in/wallet')
+const Transaction = require('../../models/logged-in/transaction')
 
 
 const login = async (req, res) => {
@@ -202,27 +208,53 @@ const stationDetail = async (req, res) => {
                 message: '_id is required'
             });
         }
-        const station = await Station.findOne({
-            _id
-        });
-        if (!station) {
+
+        const station = await Station.aggregate([
+            {
+                $match: { _id: new ObjectId(_id) } 
+            },
+            {
+                $lookup: {
+                    from: "bookings",
+                    let: { station_id: { $toString: "$_id" } },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$station_id", "$$station_id"]
+                                }
+                            }
+                        }
+                    ],
+                    as: "bookings"
+                },
+            },
+            {
+                $sort: { _id: -1 }
+            }
+        ]).exec();
+
+        if (station.length === 0) {
             return res.status(200).json({
                 status: false,
                 message: 'Station not found'
             });
+        } else {
+            res.status(200).json({
+                status: true,
+                data: station[0], // Assuming there's only one station with the given _id
+                message: 'Station fetch successfully.'
+            });
         }
-        res.status(200).json({
-            status: true,
-            data: station,
-            message: 'Station fetch successfully.'
-        });
     } catch (error) {
         res.status(200).json({
             status: false,
             message: error.message
         });
     }
-}
+};
+
+
 
 const stationList = async (req, res) => {
     try {
@@ -1360,6 +1392,297 @@ const deletePrivacyPolicy = async (req, res) => {
     }
 }
 
+const createTermsAndConditions = async (req, res) => {
+    try {
+        const { html } = req.body;
+
+        // Check for missing fields
+        if (!html) {
+            return res.status(200).json({
+                status: false,
+                message: 'HTML is required'
+            });
+        } else {
+            const termsAndConditions = await TermsAndConditions.find({});
+
+            if (termsAndConditions.length > 0) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'Terms and conditions is already exist'
+                });
+            } else {
+                const termsAndConditionsCreate = await TermsAndConditions.create({ html });
+                if (termsAndConditionsCreate) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Terms and conditions created successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Failed to Terms and conditions'
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+};
+
+const editTermsAndConditions = async (req, res) => {
+    try {
+        const { _id, html } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const findTermsAndConditions = await TermsAndConditions.findOne({
+            _id
+        });
+
+        if (!findTermsAndConditions) {
+            return res.status(200).json({
+                status: false,
+                message: 'Terms and conditions not found'
+            });
+        } else {
+            findTermsAndConditions.html = html || findTermsAndConditions.html;
+
+            const updated = await findTermsAndConditions.save();
+
+            if (updated) {
+                res.status(200).json({
+                    status: true,
+                    message: 'Terms and conditions updated successfully'
+                });
+            } else {
+                res.status(200).json({
+                    status: false,
+                    message: 'Something went wrong!'
+                });
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+};
+
+const fetchTermsAndConditions = async (req, res) => {
+    try {
+            const findTermsAndConditions = await TermsAndConditions.find({  }).sort({ _id: -1 }).exec()
+            if(findTermsAndConditions.length > 0){
+                res.status(200).json({
+                    status: true,
+                    data: findTermsAndConditions?.[0],
+                    message: 'Terms and conditions fetch successfully.'
+                });
+            }else{
+                res.status(200).json({
+                    status: false,
+                    message: 'Terms and conditions not found!'
+                });
+            }
+         
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const deleteTermsAndConditions = async (req, res) => {
+    try {
+
+        const {
+            _id
+        } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const deleted = await TermsAndConditions.findByIdAndDelete(_id);
+
+        if(deleted){
+            res.status(200).json({
+                status: true,
+                message: 'Terms and conditions delete successfully.'
+            });
+        }else{
+            res.status(200).json({
+                status: false,
+                message: 'Somthing went wrong!'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+
+const createFaqs = async (req, res) => {
+    try {
+        const { html } = req.body;
+
+        // Check for missing fields
+        if (!html) {
+            return res.status(200).json({
+                status: false,
+                message: 'HTML is required'
+            });
+        } else {
+            const find = await Faqs.find({});
+
+            if (find.length > 0) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'Faqs is already exist'
+                });
+            } else {
+                const faqsCreate = await Faqs.create({ html });
+                if (faqsCreate) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'Faqs created successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Failed to create faqs'
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+};
+
+const editFaqs = async (req, res) => {
+    try {
+        const { _id, html } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const find = await Faqs.findOne({
+            _id
+        });
+
+        if (!find) {
+            return res.status(200).json({
+                status: false,
+                message: 'Faqs not found'
+            });
+        } else {
+            find.html = html || find.html;
+
+            const updated = await find.save();
+
+            if (updated) {
+                res.status(200).json({
+                    status: true,
+                    message: 'Faqs updated successfully'
+                });
+            } else {
+                res.status(200).json({
+                    status: false,
+                    message: 'Something went wrong!'
+                });
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+};
+
+const fetchFaqs = async (req, res) => {
+    try {
+            const find = await Faqs.find({  }).sort({ _id: -1 }).exec()
+            if(find.length > 0){
+                res.status(200).json({
+                    status: true,
+                    data: find?.[0],
+                    message: 'Faqs fetch successfully.'
+                });
+            }else{
+                res.status(200).json({
+                    status: false,
+                    message: 'Faqs not found!'
+                });
+            }
+         
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const deleteFaqs = async (req, res) => {
+    try {
+
+        const {
+            _id
+        } = req.body;
+
+        if (!_id) {
+            return res.status(200).json({
+                status: false,
+                message: '_id is required'
+            });
+        }
+
+        const deleted = await Faqs.findByIdAndDelete(_id);
+
+        if(deleted){
+            res.status(200).json({
+                status: true,
+                message: 'Faqs delete successfully.'
+            });
+        }else{
+            res.status(200).json({
+                status: false,
+                message: 'Somthing went wrong!'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
 const deleteUser = async (req, res) => {
     try {
 
@@ -1403,6 +1726,50 @@ const deleteUser = async (req, res) => {
     }
 }
 
+const cancelBooking =async (req, res) => {
+    try {
+        const {_id} = req.body
+        if (!_id) {
+            return res.status(200).json({ status: false, message: '_id is required.' });
+        }else{
+
+            const update = await Booking.findOneAndUpdate(
+                { _id: new ObjectId(_id) },
+                { $set: { status: 'cancel' } },
+                { new: true } // Return the modified document
+            );
+            if(update){
+                const findWallet = await Wallet.findOne({ user_id : update?.user_id })
+                const wallet_balance =  (Number(findWallet?.amount) + Number(update?.amount))
+                const updatedWallet = await Wallet.updateOne({ user_id : update?.user_id }, { $set: { amount: wallet_balance } });
+                if(updatedWallet){
+                    const transaction = await Transaction.create({user_id : update?.user_id , station_id : update?.station_id , amount : update?.amount ,credit_or_debit : 'CR' ,transaction_reason : 'cancel' })
+                    res.status(200).json({
+                        status: true,
+                        message: 'Booking cancel successfully.'
+                    });
+                }else{
+                    res.status(200).json({
+                        status: true,
+                        message: 'Something went wrong in transaction.'
+                    });
+                }
+            }else{
+                res.status(200).json({
+                    status: true,
+                    message: 'Something went wrong!'
+                });
+            }
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
 module.exports = {
     login,
     createStation,
@@ -1440,5 +1807,14 @@ module.exports = {
     editPrivacyPolicy,
     fetchPrivacyPolicy,
     deletePrivacyPolicy,
+    createTermsAndConditions,
+    editTermsAndConditions,
+    fetchTermsAndConditions,
+    deleteTermsAndConditions,
+    createFaqs,
+    editFaqs,
+    fetchFaqs,
+    deleteFaqs,
+    cancelBooking,
     deleteUser
 };

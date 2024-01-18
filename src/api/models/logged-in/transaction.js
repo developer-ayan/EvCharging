@@ -28,6 +28,11 @@ const transactionSchema = new mongoose.Schema({
         trim: true,
         default: null,
     },
+    transaction_reason: {
+        type: String,
+        trim: true,
+        default: null,
+    },
     date: {
         type: String,
         trim: true,
