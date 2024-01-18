@@ -119,22 +119,27 @@ const stationDetail =  async (req, res) => {
                     $group: {
                         _id: '$station_id',
                         count: { $sum: 1 },
-                        avg: { $avg: { $toInt: '$rating' } } // Convert 'rating' to integer for averaging
+                        avg: { $avg: { $toDouble: '$rating' } } // Convert 'rating' to double for averaging
                     }
                 },
                 {
                     $project: {
                         _id: 1,
                         count: 1,
-                        avg: { $round: ['$avg' , 1] }
+                        avg: { $round: ['$avg', 1] }
                     }
                 }
             ]).exec();
-
+            
 
             await Promise.all([
                 Station.findOne({ _id }),
                 Port.aggregate([
+                    {
+                        $match: {
+                            station_id: _id
+                        }
+                    },
                     {
                         $lookup: {
                             from: "bookings",
