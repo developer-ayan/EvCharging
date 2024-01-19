@@ -28,6 +28,7 @@ const {
   editFaqs,
   fetchFaqs,
   deleteFaqs,
+  pushNotification
 } = require('../controllers/admin');
 
 // Destination folder
@@ -82,5 +83,8 @@ router.post("/create_faqs", upload, createFaqs);
 router.post("/edit_faqs", upload, editFaqs);
 router.post("/fetch_faqs", upload, fetchFaqs);
 router.post("/delete_faqs", upload, deleteFaqs);
+
+// push notification
+router.post("/push_notification", upload, pushNotification);
 
 module.exports = router;

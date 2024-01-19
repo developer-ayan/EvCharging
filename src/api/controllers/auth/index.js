@@ -1,3 +1,7 @@
+// controllers
+const SendSms = require('../../controllers/twilio/index')
+
+// models
 const Users = require('../../models/auth/users');
 
 // object id
@@ -11,6 +15,7 @@ const moment = require('moment')
 // helper function 
 
 const { delete_file } = require('../../../utils/helpers');
+const CountryCode = require('../../models/admin/country-code');
 
 
 const register = async (req, res) => {
@@ -128,17 +133,19 @@ const login = async (req, res) => {
             if (!user) {
                 return res.status(200).json({ status: false, message: 'User not found' });
             } else {
-                if (user?.status == 'active') {
+                if (user?.status == 'suspend') {
+                    res.status(200).json({ status: false, message: 'Your account has been suspended' });
+                }else if (user?.status == 'delete') {
+                    res.status(200).json({ status: false, message: 'Your account has been deleted.' });
+                } else  {
                     const user_update = await Users.findOneAndUpdate(
                         { _id: new ObjectId(user?._id) },
                         { $set: { notification_token: notification_token } },
                         { new: true } // Return the modified document
                     );
+                    const country_codes = await CountryCode.findOne({ _id : country_code_id});
+                    // SendSms(country_codes?.country_code + phone , `EvCharging Verification: Your one-time verification code is ${randomFourDigitNumber}. Please use this code to complete the verification process for your EvCharging account. Keep this code confidential and do not share it with anyone. If you did not initiate this verification, please disregard this message.`)
                     res.status(200).json({ status: true, data: user_update, OTP: randomFourDigitNumber, message: 'Login successfully.' });
-                }else if (user?.status == 'delete') {
-                    res.status(200).json({ status: false, message: 'Your account has been deleted.' });
-                } else {
-                    res.status(200).json({ status: false, message: 'Your account has been suspended' });
                 }
             }
         }

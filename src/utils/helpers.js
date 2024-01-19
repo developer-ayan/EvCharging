@@ -8,6 +8,17 @@ const delete_file = async (path, fileName) => {
     });
 }
 
+function removeLeadingZero(phoneNumber) {
+    // Check if the phone number starts with a zero
+    if (phoneNumber.startsWith('0')) {
+        // Remove the leading zero
+        phoneNumber = phoneNumber.slice(1);
+    }
+    
+    return phoneNumber;
+}
+
 module.exports = {
-    delete_file
+    delete_file,
+    removeLeadingZero
 }

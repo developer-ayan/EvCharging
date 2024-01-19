@@ -1,3 +1,6 @@
+// controller
+const SendSms = require('../../controllers/twilio/index')
+
 // models
 const AdminUsers = require('../../models/admin/admin-users')
 const Station = require('../../models/admin/create-station')
@@ -18,12 +21,19 @@ const ObjectId = require('mongodb').ObjectId;
 // moment
 const moment = require('moment')
 const mongoose = require('mongoose')
+const OneSignal = require('onesignal-node')
 
 // helper functions
 const { delete_file } = require('../../../utils/helpers')
 const Booking = require('../../models/logged-in/booking')
 const Wallet = require('../../models/logged-in/wallet')
 const Transaction = require('../../models/logged-in/transaction')
+
+const oneSignalClient = new OneSignal.Client({
+    apiAuthKey: 'OTMzNDhjYTItOGI2NC00ZDFlLTgxODMtODI2OTMxZGIzODUy', 
+    appId: '2fe1426b-1143-4ac2-bfa7-3fa03a5d432c'
+  });
+  
 
 
 const login = async (req, res) => {
@@ -1770,6 +1780,44 @@ const cancelBooking =async (req, res) => {
     }
 }
 
+const pushNotification = async (req, res) => {
+    try {
+        const { app_id, notification_token } = req.body;
+
+        const oneSignalClient = new OneSignal.Client({
+            apiAuthKey: 'OTMzNDhjYTItOGI2NC00ZDFlLTgxODMtODI2OTMxZGIzODUy', 
+            appId: '2fe1426b-1143-4ac2-bfa7-3fa03a5d432c'
+          });
+
+        // Create a notification
+        const notification = {
+            headings: { en: 'Notification Title' },
+            contents: { en: 'Hello, this is a push notification!' },
+            // include_player_ids: [notification_token]
+            included_segments: ['All'] // Send to all subscribed users
+        };
+
+        // Log the constructed notification for debugging
+        console.log('Constructed Notification:', notification);
+
+        // Send the notification
+        oneSignalClient.createNotification(notification).then(response => {
+            console.log('Notification sent successfully:', response.body);
+            res.status(200).json({ status: true, message: response.body });
+        }).catch(error => {
+            console.error('Error sending notification:', error.message);
+            res.status(500).json({ status: false, message: error.message });
+        });
+
+    } catch (error) {
+        console.error('Internal Server Error:', error);
+        res.status(500).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+};
+
 module.exports = {
     login,
     createStation,
@@ -1816,5 +1864,6 @@ module.exports = {
     fetchFaqs,
     deleteFaqs,
     cancelBooking,
+    pushNotification,
     deleteUser
 };
