@@ -7,6 +7,7 @@ const Rating = require('../../models/logged-in/station-rating')
 const Wallet = require('../../models/logged-in/wallet')
 const Booking = require('../../models/logged-in/booking')
 const Transaction = require('../../models/logged-in/transaction')
+const Notification = require('../../models/common/notification')
 
 // object id
 
@@ -15,10 +16,12 @@ const ObjectId = require('mongodb').ObjectId;
 // moment
 
 const moment = require('moment')
+const cron = require('node-cron');
 
 // date formate
 
 const { DATE_FORMATE } = require('../../../utils/urls')
+const { sendNotification } = require('../../../utils/helpers')
 
 
 const dashboardStations = async (req, res) => {
@@ -111,7 +114,6 @@ const stationDetail =  async (req, res) => {
         if (!_id) {
             return res.status(200).json({ status: false, message: '_id is required' });
         } else {
-
             const stationRating = await Rating.aggregate([
                 { $match: { station_id: _id } },
                 { $sort: { _id: -1 } },
@@ -319,13 +321,13 @@ const searchStation =  async (req, res) => {
 
 const sendStationReview = async (req, res) => {
     try {
-        const { rating, description, station_id } = req.body;
+        const { rating, description, station_id , booking_id } = req.body;
         if (!station_id) {
             return res.status(200).json({ status: true, data: [], message: 'station_id is required' });
         } else if (!rating) {
             return res.status(200).json({ status: true, data: [], message: 'rating is required' });
         } else {
-            const ratingSend = await Rating.create({ station_id, rating, description });
+            const ratingSend = await Rating.create({ station_id, rating, description , booking_id });
             if (ratingSend) {
                 return res.status(200).json({ status: true, message: 'Send review successfully.' });
             } else {
@@ -425,7 +427,6 @@ const portSlots = async (req, res) => {
 
                     // Filter the slots based on the current time
                     const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
-
                     const data = {
                         station_detail: {
                             ...resonse?.toObject(),
@@ -491,7 +492,7 @@ const portSlots = async (req, res) => {
 
                     // Filter the slots based on the current time
                     const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
-
+                    console.log('filteredSlots' , filteredSlots)
                     const data = {
                         station_detail: {
                             ...resonse?.toObject(),
@@ -849,6 +850,15 @@ const transactionSuccessfully =async (req, res) => {
         if (!station_id || !port_id || !start_time || !end_time) {
             return res.status(200).json({ status: false, message: 'All fields are required.' });
         } else {
+
+            const startMoment = moment(start_time, 'h:mm A');
+            const endMoment = moment(end_time, 'h:mm A');
+
+            if (!startMoment.isValid() || !endMoment.isValid()) {
+                return res.status(200).json({ status: false, message: 'Invalid time format. Please use h:mm A format.' });
+            }
+
+            const slots = generateSlots(startMoment, endMoment, false);
             try {
                 const [station_detail, port_detail , booking_detail] = await Promise.all([
                     Station.findOne({ _id: station_id }),
@@ -861,7 +871,8 @@ const transactionSuccessfully =async (req, res) => {
                         station_detail,
                         port_detail,
                         unit_price: hourConvertIntoMinute(port_detail.unit_price, start_time, end_time),
-                        transaction_id : booking_detail?.transaction_id
+                        transaction_id : booking_detail?.transaction_id,
+                        unit_allocated : slots?.length - 1
                     };
 
                     return res.status(200).json({ status: true, data, message: 'Transaction detail fetch successfully.' });
@@ -929,6 +940,62 @@ const bookingHistory =async (req, res) => {
     }
 }
 
+// Function to check and log bookings
+const checkBookings = async () => {
+    try {
+        const currentDateTime = moment(new Date());
+        const newDateTime = currentDateTime.add(7, 'minutes');
+        console.log('newDateTime' , currentDateTime.format('hh:mm A'))
+
+            const bookings = await Booking.aggregate([
+                {
+                    $match: {
+                        start_time:  currentDateTime.format('hh:mm A'),
+                        date : moment(new Date()).format(DATE_FORMATE)
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "stations",
+                        let: { stationId: "$station_id" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ["$_id", { $toObjectId: "$$stationId" }]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "station_detail"
+                    },
+                },
+                {
+                    $unwind: "$station_detail"
+                },
+            ]).exec();
+        if (bookings.length > 0) {
+            bookings.forEach(booking => {
+                if(booking.status == 'pending'){
+                    sendNotification(booking?.user_id , 'Booking alert' , `You have a booking at ${booking?.station_detail?.station_name} from ${booking.start_time} to ${booking.end_time}.`)
+                }else{
+                    console.log(`We don't need push notification`);
+                }
+            });
+        } else {
+            console.log('No bookings found.');
+        }
+    } catch (error) {
+        console.error('Error checking bookings:', error.message);
+    }
+};
+
+// Schedule the cron job to run every 2 seconds
+cron.schedule('*/10 * * * * *', () => {
+    console.log('Running cron job...');
+    checkBookings();
+});
+
 const stationQrCode =  async (req, res) => {
     try {
         const {serial_no} = req.body
@@ -948,8 +1015,59 @@ const stationQrCode =  async (req, res) => {
                 message: 'Station not found!'
             });
         }
+    } 
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
 }
-       
+
+const fetchNotification =  async (req, res) => {
+    try {
+        const {user_id} = req.body
+        if (!user_id) {
+            return res.status(200).json({ status: false, message: 'user_id is required.' });
+        }else{
+            const notification_detail = await Notification.find({ user_id  }).sort({ _id: -1 }).exec();
+            res.status(200).json({
+                status: true,
+                data: notification_detail,
+                message: 'Notification fetch successfully.'
+            });
+    }  
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const readNotification =  async (req, res) => {
+    try {
+        const {_id , user_id , read_all} = req.body
+            if(read_all){
+                const updateManyResult = await Notification.updateMany(
+                    { user_id },
+                    { $set: { read: true } }
+                );
+                if(updateManyResult){
+                    res.status(200).json({status: true,message: 'Notification read successfully.'});
+                }else{
+                    res.status(200).json({status: false,message: 'Something went wrong!'});
+                }
+            }else{
+                const readOne = await Notification.updateOne({ _id }, { $set: { read: true } });
+                if(readOne){
+                    res.status(200).json({status: true,message: 'Notification read successfully.'});
+                }else{
+                    res.status(200).json({status: false,message: 'Something went wrong!'});
+                }
+            }
     } catch (error) {
         console.error(error);
         res.status(200).json({
@@ -1034,5 +1152,7 @@ module.exports = {
     transaction,
     transactionSuccessfully,
     bookingHistory,
-    stationQrCode
+    stationQrCode,
+    fetchNotification,
+    readNotification
   };

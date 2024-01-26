@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
 const { DATE_FORMATE } = require('../../../utils/urls');
+const { created_at } = require('../../../utils/static-values');
 
 const bookingSchema = new mongoose.Schema({
     user_id: {
@@ -47,6 +48,11 @@ const bookingSchema = new mongoose.Schema({
         type: String,
         trim: true,
         default: moment(new Date()).format(DATE_FORMATE),
+    },
+    created_at: {
+        type: String,
+        trim: true,
+        default: created_at,
     },
 });
 

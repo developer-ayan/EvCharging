@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const moment = require('moment');
 const { DATE_FORMATE } = require('../../../utils/urls');
 const { v4: uuidv4 } = require('uuid');
+const { created_at } = require('../../../utils/static-values');
 
 const transactionSchema = new mongoose.Schema({
     user_id: {
@@ -36,7 +37,7 @@ const transactionSchema = new mongoose.Schema({
     date: {
         type: String,
         trim: true,
-        default: moment(new Date()).format(DATE_FORMATE) + ' ' + moment(new Date()).format('hh:mm A') ,
+        default: created_at,
     },
 });
 

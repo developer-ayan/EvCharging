@@ -24,15 +24,12 @@ const mongoose = require('mongoose')
 const OneSignal = require('onesignal-node')
 
 // helper functions
-const { delete_file } = require('../../../utils/helpers')
+const { delete_file, sendNotification } = require('../../../utils/helpers')
 const Booking = require('../../models/logged-in/booking')
 const Wallet = require('../../models/logged-in/wallet')
 const Transaction = require('../../models/logged-in/transaction')
 
-const oneSignalClient = new OneSignal.Client({
-    apiAuthKey: 'OTMzNDhjYTItOGI2NC00ZDFlLTgxODMtODI2OTMxZGIzODUy', 
-    appId: '2fe1426b-1143-4ac2-bfa7-3fa03a5d432c'
-  });
+
   
 
 
@@ -241,7 +238,39 @@ const stationDetail = async (req, res) => {
             },
             {
                 $sort: { _id: -1 }
-            }
+            },
+            {
+                $lookup: {
+                    from: "station_reviews",
+                    let: { station_id: { $toString: "$_id" } },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$station_id", "$$station_id"]
+                                }
+                            }
+                        }
+                    ],
+                    as: "reviews"
+                },
+            },
+            {
+                $lookup: {
+                    from: "ports",
+                    let: { station_id: { $toString: "$_id" } },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$station_id", "$$station_id"]
+                                }
+                            }
+                        }
+                    ],
+                    as: "ports"
+                },
+            },
         ]).exec();
 
         if (station.length === 0) {
@@ -284,7 +313,6 @@ const stationList = async (req, res) => {
 }
 
 const createStationPort = async (req, res) => {
-    console.log('req.file' , req.file.filename)
     try {
         const {
             station_id,
@@ -455,7 +483,6 @@ const deletePort = async (req, res) => {
         const {
             _id
         } = req.body;
-
         if (!_id) {
             return res.status(200).json({
                 status: false,
@@ -1754,6 +1781,7 @@ const cancelBooking =async (req, res) => {
                 const updatedWallet = await Wallet.updateOne({ user_id : update?.user_id }, { $set: { amount: wallet_balance } });
                 if(updatedWallet){
                     const transaction = await Transaction.create({user_id : update?.user_id , station_id : update?.station_id , amount : update?.amount ,credit_or_debit : 'CR' ,transaction_reason : 'cancel' })
+                    sendNotification(update?.user_id  , "Booking cancel" , "We are canceling your booking, and we are refunding the amount to your wallet.")
                     res.status(200).json({
                         status: true,
                         message: 'Booking cancel successfully.'
@@ -1782,41 +1810,16 @@ const cancelBooking =async (req, res) => {
 
 const pushNotification = async (req, res) => {
     try {
-        const { app_id, notification_token } = req.body;
-
-        const oneSignalClient = new OneSignal.Client({
-            apiAuthKey: 'OTMzNDhjYTItOGI2NC00ZDFlLTgxODMtODI2OTMxZGIzODUy', 
-            appId: '2fe1426b-1143-4ac2-bfa7-3fa03a5d432c'
-          });
-
-        // Create a notification
-        const notification = {
-            headings: { en: 'Notification Title' },
-            contents: { en: 'Hello, this is a push notification!' },
-            // include_player_ids: [notification_token]
-            included_segments: ['All'] // Send to all subscribed users
-        };
-
-        // Log the constructed notification for debugging
-        console.log('Constructed Notification:', notification);
-
-        // Send the notification
-        oneSignalClient.createNotification(notification).then(response => {
-            console.log('Notification sent successfully:', response.body);
-            res.status(200).json({ status: true, message: response.body });
-        }).catch(error => {
-            console.error('Error sending notification:', error.message);
-            res.status(500).json({ status: false, message: error.message });
-        });
-
+        sendNotification('', '' , "Booking cancel" , "Your booking has been cancled")    
     } catch (error) {
-        console.error('Internal Server Error:', error);
+        console.error('Error in pushNotification:', error);
         res.status(500).json({
             status: false,
-            message: 'Internal Server Error'
+            message: 'Internal Server Error in pushNotification',
+            error: error.message,
         });
     }
-};
+}
 
 module.exports = {
     login,

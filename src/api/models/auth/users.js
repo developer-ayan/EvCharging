@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { created_at } = require('../../../utils/static-values');
 
 const registerSchema = new mongoose.Schema({
     name: {
@@ -43,6 +44,11 @@ const registerSchema = new mongoose.Schema({
         type: String,
         default: null, // Set the default value here
         trim: true,
+    },
+    date: {
+        type: String,
+        trim: true,
+        default: created_at,
     },
 });
 

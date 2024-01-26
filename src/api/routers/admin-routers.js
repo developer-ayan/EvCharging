@@ -31,6 +31,7 @@ const {
   userEditDetail,
   cancelBooking,
 } = require('../controllers/admin');
+const headerMiddleware = require('../middlewares/headerMiddleware');
 
 // Destination folder
 const destinationFolder = './uploads/station_images/';
@@ -88,7 +89,7 @@ router.post("/fetch_profile", upload, fetchProfile);
 
 // station
 
-router.get("/station_list", stationList);
+router.get("/station_list", headerMiddleware , stationList);
 router.post("/create_station", upload_single_station, createStation);
 router.post("/edit_station", upload_single_station, editStation);
 router.post("/station_detail", upload, stationDetail);

@@ -4,10 +4,20 @@ require('./src/config/conn');
 
 const express = require('express');
 const path = require('path');
+const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(express.json());
+// app.use(cors({origin : 'http://localhost:3000'}));
+const allowedOrigins = ['http://localhost:3000', 'https://evcharging-be0a6.web.app'];
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true,
+  optionsSuccessStatus: 204,
+}));
 app.use('/uploads/station_images', express.static('uploads/station_images'));
 app.use('/uploads/users', express.static('uploads/users'));
 app.use('/uploads/port_images', express.static('uploads/port_images'));

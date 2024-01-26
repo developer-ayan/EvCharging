@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { created_at } = require('../../../utils/static-values');
 
 const adminUserSchema = new mongoose.Schema({
     email: {
@@ -19,6 +20,11 @@ const adminUserSchema = new mongoose.Schema({
     profile_image: {
         type: String,
         default: null,
+        trim: true,
+    },
+    created_at: {
+        type: String,
+        default: created_at,
         trim: true,
     },
 });

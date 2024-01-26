@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const { created_at } = require('../../../utils/static-values');
 
 const stationSchema = new mongoose.Schema({
     station_name: {
@@ -41,6 +42,11 @@ const stationSchema = new mongoose.Schema({
         type: String,
         default: generateCustomSerialNumber,
         unique: true,
+    },
+    date: {
+        type: String,
+        trim: true,
+        default: created_at,
     },
 });
 

@@ -20,7 +20,7 @@ const CountryCode = require('../../models/admin/country-code');
 
 const register = async (req, res) => {
     try {
-        const { name, phone, email, country_code_id } = req.body;
+        const { name, phone, email, country_code_id, notification_token } = req.body;
 
         if (!name || !phone) {
             return res.status(200).json({ status: false, message: 'All fields are required' });

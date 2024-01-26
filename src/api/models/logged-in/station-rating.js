@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+const { created_at } = require('../../../utils/static-values');
 
 const ratingSchema = new mongoose.Schema({
     station_id: {
@@ -13,6 +14,15 @@ const ratingSchema = new mongoose.Schema({
     description: {
         type: String,
         trim: true,
+    },
+    booking_id: {
+        type: String,
+        trim: true,
+    },
+    date: {
+        type: String,
+        trim: true,
+        default: created_at,
     },
 });
 

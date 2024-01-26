@@ -16,7 +16,9 @@ const {
     transaction,
     transactionSuccessfully,
     bookingHistory,
-    stationQrCode
+    stationQrCode,
+    fetchNotification,
+    readNotification
  } = require('../controllers/logged-in');
 
 // Stations 
@@ -34,9 +36,13 @@ router.post("/booking_port", upload, bookingPort);
 // Wallet
 router.post("/wallet", upload, wallet);
 router.post("/transaction", upload, transaction)
-router.post("/transaction_successfully", upload,transactionSuccessfully);
+router.post("/transaction_successfully", upload, transactionSuccessfully);
 
 // booking history
 router.post("/booking_history", upload,  bookingHistory);
+
+// notification
+router.post("/fetch_notification", upload,  fetchNotification);
+router.post("/read_notification", upload,  readNotification);
 
 module.exports = router;

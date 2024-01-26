@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
-const moment = require('moment');
-const { DATE_FORMATE } = require('../../../utils/urls');
+const { created_at } = require('../../../utils/static-values');
 
 const creditWalletSchema = new mongoose.Schema({
     user_id: {
@@ -16,6 +15,11 @@ const creditWalletSchema = new mongoose.Schema({
         type: String,
         trim: true,
         default: null,
+    },
+    date: {
+        type: String,
+        trim: true,
+        default: created_at,
     },
 });
 

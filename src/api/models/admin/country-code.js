@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { created_at } = require('../../../utils/static-values');
 
 const countryCodeSchema = new mongoose.Schema({
     country_code: {
@@ -20,6 +21,11 @@ const countryCodeSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
+    },
+    date: {
+        type: String,
+        trim: true,
+        default: created_at,
     },
 });
 
