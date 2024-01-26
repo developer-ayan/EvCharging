@@ -771,7 +771,7 @@ const stationReviews = async (req, res) => {
         } else {
             const stationRating = await Rating.find({ station_id }).sort({ _id: -1 }).exec()
             if (stationRating) {
-                return res.status(200).json({ status: true, data: stationRating, message: 'Reviews fetch successfully.' });
+                return res.status(200).json({ status: true, data: stationRating, message: 'Review fetch successfully.' });
             } else {
                 return res.status(200).json({ status: false, data: [], message: 'Reviews not found!' });
             }
