@@ -30,6 +30,9 @@ const {
   userFetchDetail,
   userEditDetail,
   cancelBooking,
+  changePassword,
+  verifyEmail,
+  forgetPassword
 } = require('../controllers/admin');
 const headerMiddleware = require('../middlewares/headerMiddleware');
 
@@ -37,11 +40,16 @@ const headerMiddleware = require('../middlewares/headerMiddleware');
 const destinationFolder = './uploads/station_images/';
 const countryFolder = './uploads/country_images/';
 const portFolder = './uploads/port_images/';
+const userFolder = './uploads/users/';
 
 // Create the destination folder if it doesn't exist
 
 if (!fs.existsSync(countryFolder)) {
   fs.mkdirSync(countryFolder, { recursive: true });
+}
+
+if (!fs.existsSync(userFolder)) {
+  fs.mkdirSync(userFolder, { recursive: true });
 }
 
 if (!fs.existsSync(destinationFolder)) {
@@ -53,9 +61,9 @@ if (!fs.existsSync(portFolder)) {
 }
 
 // Set storage engine
-const storage = multer.diskStorage({
+const storage_user = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, destinationFolder);
+    cb(null, userFolder);
   },
   filename: (req, file, cb) => {
     cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
@@ -72,15 +80,29 @@ const storage_port = multer.diskStorage({
   }
 });
 
-const upload_single = multer({ storage }).single('profile_image');
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, destinationFolder);
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
+const upload_single = multer({ storage: storage_user }).single('profile_image');
 const upload_single_station = multer({ storage }).single('station_image');
-const upload_single_port = multer({ storage : storage_port }).single('port_image');
+const upload_single_port = multer({ storage: storage_port }).single('port_image');
 
 // auth
 
 router.post("/login", upload, login);
 router.post("/register", upload, register);
 router.post("/registration_otp_verfication", upload, registerationOtpVerification);
+router.post("/change_password", upload, changePassword);
+router.post("/verify_email", upload, verifyEmail);
+router.post("/forget_password", upload, forgetPassword);
+
 
 // admin profile 
 
@@ -89,7 +111,7 @@ router.post("/fetch_profile", upload, fetchProfile);
 
 // station
 
-router.get("/station_list", headerMiddleware , stationList);
+router.get("/station_list", headerMiddleware, stationList);
 router.post("/create_station", upload_single_station, createStation);
 router.post("/edit_station", upload_single_station, editStation);
 router.post("/station_detail", upload, stationDetail);

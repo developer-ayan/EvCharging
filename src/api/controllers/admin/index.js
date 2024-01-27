@@ -30,7 +30,7 @@ const Wallet = require('../../models/logged-in/wallet')
 const Transaction = require('../../models/logged-in/transaction')
 
 
-  
+
 
 
 const login = async (req, res) => {
@@ -156,7 +156,7 @@ const editStation = async (req, res) => {
         station.location.name = location || station.location.name;
 
         if (req.file) {
-            delete_file('/uploads/station_images/' , station.station_image)
+            delete_file('/uploads/station_images/', station.station_image)
             station.station_image = req.file.filename;
         }
 
@@ -218,7 +218,7 @@ const stationDetail = async (req, res) => {
 
         const station = await Station.aggregate([
             {
-                $match: { _id: new ObjectId(_id) } 
+                $match: { _id: new ObjectId(_id) }
             },
             {
                 $lookup: {
@@ -378,7 +378,7 @@ const editStationPort = async (req, res) => {
             port.port_name = port_name || port.port_name;
             port.port_description = port_description || port.port_description;
             if (req.file) {
-                delete_file('/uploads/port_images/' , port.port_image)
+                delete_file('/uploads/port_images/', port.port_image)
                 port.port_image = req.file.filename;
             }
             const updatePort = await port.save();
@@ -573,7 +573,7 @@ const registerationOtpVerification = async (req, res) => {
                 data: {
                     OTP: randomFourDigitNumber
                 },
-                message: 'We have sent an OTP to your number.'
+                message: 'We have sent an OTP to your email.'
             });
         }
     } catch (error) {
@@ -626,7 +626,7 @@ const editProfile = async (req, res) => {
                 user.name = name || user.name;
 
                 if (req.file) {
-                    delete_file('/uploads/users/' , user.profile_image)
+                    delete_file('/uploads/users/', user.profile_image)
                     user.profile_image = req.file.filename;
                 }
 
@@ -642,6 +642,134 @@ const editProfile = async (req, res) => {
                         message: 'Something went wrong!'
                     });
                 }
+            }
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
+
+const changePassword = async (req, res) => {
+    try {
+
+        const {
+            user_id,
+            password
+        } = req.body;
+        if (!user_id) {
+            return res.status(200).json({
+                status: false,
+                message: 'user_id is required'
+            });
+        }
+        const user = await AdminUsers.findOne({
+            _id: user_id
+        });
+        if (!user) {
+            return res.status(200).json({
+                status: false,
+                message: 'User not found'
+            });
+        } else {
+            if (user.password == password) {
+                res.status(200).json({
+                    status: false,
+                    message: 'You cannot change your password to a previous one.'
+                });
+            } else {
+                user.password = password || user.password;
+                const update = await user.save();
+                res.status(200).json({
+                    status: true,
+                    data: update,
+                    message: 'Password updated successfully'
+                });
+            }
+        }
+
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
+
+const verifyEmail = async (req, res) => {
+    try {
+
+        const {
+            email,
+        } = req.body;
+        const randomFourDigitNumber = Math.floor(Math.random() * 9000) + 1000;
+        if (!email) {
+            return res.status(200).json({
+                status: false,
+                message: 'email is required'
+            });
+        }
+        const user = await AdminUsers.findOne({
+            email
+        });
+        if (!user) {
+            return res.status(200).json({
+                status: false,
+                message: 'No account has been found associated with this email address.'
+            });
+        } else {
+            res.status(200).json({
+                status: true,
+                data: {
+                    OTP: randomFourDigitNumber
+                },
+                message: 'We have sent an OTP to your email.'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
+
+const forgetPassword = async (req, res) => {
+    try {
+
+        const {
+            email,
+            password
+        } = req.body;
+        if (!email) {
+            return res.status(200).json({
+                status: false,
+                message: 'Email is required'
+            });
+        } else if (!password) {
+            return res.status(200).json({
+                status: false,
+                message: 'Password is required'
+            });
+        } else {
+            const user = await AdminUsers.findOne({
+                email
+            });
+            if (!email) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'User not found'
+                });
+            } else {
+                user.password = password || user.password;
+                const update = await user.save();
+                res.status(200).json({
+                    status: true,
+                    data: update,
+                    message: 'Password updated successfully'
+                });
             }
         }
     } catch (error) {
@@ -912,7 +1040,7 @@ const userEditDetail = async (req, res) => {
 
 const createCountryCode = async (req, res) => {
     try {
-        console.log('req.file.filename' , req.file.filename)
+        console.log('req.file.filename', req.file.filename)
         const { country_code, country_name, country_short_name } = req.body;
 
         // Check for missing fields
@@ -1006,7 +1134,7 @@ const editCountryCode = async (req, res) => {
                 countryCode.country_short_name = country_short_name || countryCode.country_short_name;
 
                 if (req.file) {
-                    delete_file('/uploads/country_images/' , countryCode.country_image)
+                    delete_file('/uploads/country_images/', countryCode.country_image)
                     countryCode.country_image = req.file.filename;
                 }
 
@@ -1091,12 +1219,12 @@ const deleteCountryCode = async (req, res) => {
 
         const deletedCountryCode = await CountryCode.findByIdAndDelete(_id);
 
-        if(deletedCountryCode){
+        if (deletedCountryCode) {
             res.status(200).json({
                 status: true,
                 message: 'Country code delete successfully.'
             });
-        }else{
+        } else {
             res.status(200).json({
                 status: false,
                 message: 'Somthing went wrong!'
@@ -1262,12 +1390,12 @@ const deleteVehicle = async (req, res) => {
 
         const deletedVehicle = await Vehicles.findByIdAndDelete(_id);
 
-        if(deletedVehicle){
+        if (deletedVehicle) {
             res.status(200).json({
                 status: true,
                 message: 'Vehicle delete successfully.'
             });
-        }else{
+        } else {
             res.status(200).json({
                 status: false,
                 message: 'Somthing went wrong!'
@@ -1372,20 +1500,20 @@ const editPrivacyPolicy = async (req, res) => {
 
 const fetchPrivacyPolicy = async (req, res) => {
     try {
-            const findPrivacyPolicy = await PrivacyPolicy.find({  }).sort({ _id: -1 }).exec()
-            if(findPrivacyPolicy.length > 0){
-                res.status(200).json({
-                    status: true,
-                    data: findPrivacyPolicy?.[0],
-                    message: 'Privacy policy fetch successfully.'
-                });
-            }else{
-                res.status(200).json({
-                    status: false,
-                    message: 'Privacy policy not found!'
-                });
-            }
-         
+        const findPrivacyPolicy = await PrivacyPolicy.find({}).sort({ _id: -1 }).exec()
+        if (findPrivacyPolicy.length > 0) {
+            res.status(200).json({
+                status: true,
+                data: findPrivacyPolicy?.[0],
+                message: 'Privacy policy fetch successfully.'
+            });
+        } else {
+            res.status(200).json({
+                status: false,
+                message: 'Privacy policy not found!'
+            });
+        }
+
     } catch (error) {
         res.status(200).json({
             status: false,
@@ -1410,12 +1538,12 @@ const deletePrivacyPolicy = async (req, res) => {
 
         const deleted = await PrivacyPolicy.findByIdAndDelete(_id);
 
-        if(deleted){
+        if (deleted) {
             res.status(200).json({
                 status: true,
                 message: 'Privacy policy delete successfully.'
             });
-        }else{
+        } else {
             res.status(200).json({
                 status: false,
                 message: 'Somthing went wrong!'
@@ -1517,20 +1645,20 @@ const editTermsAndConditions = async (req, res) => {
 
 const fetchTermsAndConditions = async (req, res) => {
     try {
-            const findTermsAndConditions = await TermsAndConditions.find({  }).sort({ _id: -1 }).exec()
-            if(findTermsAndConditions.length > 0){
-                res.status(200).json({
-                    status: true,
-                    data: findTermsAndConditions?.[0],
-                    message: 'Terms and conditions fetch successfully.'
-                });
-            }else{
-                res.status(200).json({
-                    status: false,
-                    message: 'Terms and conditions not found!'
-                });
-            }
-         
+        const findTermsAndConditions = await TermsAndConditions.find({}).sort({ _id: -1 }).exec()
+        if (findTermsAndConditions.length > 0) {
+            res.status(200).json({
+                status: true,
+                data: findTermsAndConditions?.[0],
+                message: 'Terms and conditions fetch successfully.'
+            });
+        } else {
+            res.status(200).json({
+                status: false,
+                message: 'Terms and conditions not found!'
+            });
+        }
+
     } catch (error) {
         res.status(200).json({
             status: false,
@@ -1555,12 +1683,12 @@ const deleteTermsAndConditions = async (req, res) => {
 
         const deleted = await TermsAndConditions.findByIdAndDelete(_id);
 
-        if(deleted){
+        if (deleted) {
             res.status(200).json({
                 status: true,
                 message: 'Terms and conditions delete successfully.'
             });
-        }else{
+        } else {
             res.status(200).json({
                 status: false,
                 message: 'Somthing went wrong!'
@@ -1663,20 +1791,20 @@ const editFaqs = async (req, res) => {
 
 const fetchFaqs = async (req, res) => {
     try {
-            const find = await Faqs.find({  }).sort({ _id: -1 }).exec()
-            if(find.length > 0){
-                res.status(200).json({
-                    status: true,
-                    data: find?.[0],
-                    message: 'Faqs fetch successfully.'
-                });
-            }else{
-                res.status(200).json({
-                    status: false,
-                    message: 'Faqs not found!'
-                });
-            }
-         
+        const find = await Faqs.find({}).sort({ _id: -1 }).exec()
+        if (find.length > 0) {
+            res.status(200).json({
+                status: true,
+                data: find?.[0],
+                message: 'Faqs fetch successfully.'
+            });
+        } else {
+            res.status(200).json({
+                status: false,
+                message: 'Faqs not found!'
+            });
+        }
+
     } catch (error) {
         res.status(200).json({
             status: false,
@@ -1701,12 +1829,12 @@ const deleteFaqs = async (req, res) => {
 
         const deleted = await Faqs.findByIdAndDelete(_id);
 
-        if(deleted){
+        if (deleted) {
             res.status(200).json({
                 status: true,
                 message: 'Faqs delete successfully.'
             });
-        }else{
+        } else {
             res.status(200).json({
                 status: false,
                 message: 'Somthing went wrong!'
@@ -1732,12 +1860,12 @@ const deleteUser = async (req, res) => {
             return res.status(200).json({ status: false, message: 'User not found' });
         } else {
 
-            const existingUsers = await Users.findOne({_id});
+            const existingUsers = await Users.findOne({ _id });
 
             if (existingUsers) {
                 user.name = user.name;
                 user.bike_mode = user.bike_mode;
-                user.phone =  user.phone;
+                user.phone = user.phone;
                 user.country_code_id = user.country_code_id;
                 user.profile_image = user.profile_image;
                 user.status = 'delete';
@@ -1748,7 +1876,7 @@ const deleteUser = async (req, res) => {
                 } else {
                     res.status(200).json({ status: false, message: 'Something went wrong!' });
                 }
-              
+
             } else {
                 return res.status(200).json({
                     status: false,
@@ -1763,36 +1891,36 @@ const deleteUser = async (req, res) => {
     }
 }
 
-const cancelBooking =async (req, res) => {
+const cancelBooking = async (req, res) => {
     try {
-        const {_id} = req.body
+        const { _id } = req.body
         if (!_id) {
             return res.status(200).json({ status: false, message: '_id is required.' });
-        }else{
+        } else {
 
             const update = await Booking.findOneAndUpdate(
                 { _id: new ObjectId(_id) },
                 { $set: { status: 'cancel' } },
                 { new: true } // Return the modified document
             );
-            if(update){
-                const findWallet = await Wallet.findOne({ user_id : update?.user_id })
-                const wallet_balance =  (Number(findWallet?.amount) + Number(update?.amount))
-                const updatedWallet = await Wallet.updateOne({ user_id : update?.user_id }, { $set: { amount: wallet_balance } });
-                if(updatedWallet){
-                    const transaction = await Transaction.create({user_id : update?.user_id , station_id : update?.station_id , amount : update?.amount ,credit_or_debit : 'CR' ,transaction_reason : 'cancel' })
-                    sendNotification(update?.user_id  , "Booking cancel" , "We are canceling your booking, and we are refunding the amount to your wallet.")
+            if (update) {
+                const findWallet = await Wallet.findOne({ user_id: update?.user_id })
+                const wallet_balance = (Number(findWallet?.amount) + Number(update?.amount))
+                const updatedWallet = await Wallet.updateOne({ user_id: update?.user_id }, { $set: { amount: wallet_balance } });
+                if (updatedWallet) {
+                    const transaction = await Transaction.create({ user_id: update?.user_id, station_id: update?.station_id, amount: update?.amount, credit_or_debit: 'CR', transaction_reason: 'cancel' })
+                    sendNotification(update?.user_id, "Booking cancel", "We are canceling your booking, and we are refunding the amount to your wallet.")
                     res.status(200).json({
                         status: true,
                         message: 'Booking cancel successfully.'
                     });
-                }else{
+                } else {
                     res.status(200).json({
                         status: true,
                         message: 'Something went wrong in transaction.'
                     });
                 }
-            }else{
+            } else {
                 res.status(200).json({
                     status: true,
                     message: 'Something went wrong!'
@@ -1810,7 +1938,7 @@ const cancelBooking =async (req, res) => {
 
 const pushNotification = async (req, res) => {
     try {
-        sendNotification('', '' , "Booking cancel" , "Your booking has been cancled")    
+        sendNotification('', '', "Booking cancel", "Your booking has been cancled")
     } catch (error) {
         console.error('Error in pushNotification:', error);
         res.status(500).json({
@@ -1868,5 +1996,8 @@ module.exports = {
     deleteFaqs,
     cancelBooking,
     pushNotification,
-    deleteUser
+    deleteUser,
+    changePassword,
+    verifyEmail,
+    forgetPassword
 };
