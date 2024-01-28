@@ -939,7 +939,25 @@ const stationReviews = async (req, res) => {
 
 const users = async (req, res) => {
     try {
-        const users = await Users.find({}).sort({ _id: -1 }).exec()
+        const users = await Users.aggregate([
+            {
+                $lookup: {
+                    from: "country_codes",
+                    let: { country_code_id: { $toString: "$country_code_id" } },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $eq: ["$_id", "$$country_code_id"]
+                                }
+                            }
+                        }
+                    ],
+                    as: "country_code"
+                },
+            },
+          ]).exec();
+        
         res.status(200).json({
             status: true,
             data: users,
