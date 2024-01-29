@@ -582,7 +582,7 @@ const subAdminRegister = async (req, res) => {
                 name,
                 admin_id,
                 role_id,
-                profile_image : req.file.filename || null
+                profile_image: req.file ? req.file.filename : null,
             });
             res.status(200).json({
                 status: true,
