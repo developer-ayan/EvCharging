@@ -8,10 +8,6 @@ const Users = require('../../models/auth/users');
 
 const ObjectId = require('mongodb').ObjectId;
 
-// moment
-
-const moment = require('moment')
-
 // helper function 
 
 const { delete_file } = require('../../../utils/helpers');

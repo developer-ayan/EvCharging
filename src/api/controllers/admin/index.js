@@ -18,11 +18,6 @@ const Faqs = require('../../models/admin/faqs')
 // object id
 const ObjectId = require('mongodb').ObjectId;
 
-// moment
-const moment = require('moment')
-const mongoose = require('mongoose')
-const OneSignal = require('onesignal-node')
-
 // helper functions
 const { delete_file, sendNotification } = require('../../../utils/helpers')
 const Booking = require('../../models/logged-in/booking')
