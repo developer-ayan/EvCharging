@@ -15,14 +15,13 @@ const ObjectId = require('mongodb').ObjectId;
 
 // moment
 
-const moment = require('moment-timezone')
+const moment = require('moment')
 const cron = require('node-cron');
 
 // date formate
 
 const { DATE_FORMATE } = require('../../../utils/urls')
 const { sendNotification } = require('../../../utils/helpers')
-const { time_zone } = require('../../../utils/static-values')
 
 
 const dashboardStations = async (req, res) => {
@@ -162,22 +161,22 @@ const stationDetail =  async (req, res) => {
                 ]).sort({ _id: -1 }).exec(),
             ]).then((resonse) => {
                 if (resonse[0]) {
-                    const startMoment = moment(resonse[0].start_time, 'h:mm A').tz(time_zone)
-                    const endMoment = moment(resonse[0].end_time, 'h:mm A').tz(time_zone);
+                    const startMoment = moment(resonse[0].start_time, 'h:mm A');
+                    const endMoment = moment(resonse[0].end_time, 'h:mm A');
                     const slots = generateSlots(startMoment, endMoment, false);
 
                     
-                    const currentTime = moment().tz(time_zone); // Get the current time
-                    const currentMoment = moment(currentTime, 'h:mm A').tz(time_zone);
-                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').tz(time_zone).isAfter(currentMoment));
+                    const currentTime = moment(); // Get the current time
+                    const currentMoment = moment(currentTime, 'h:mm A');
+                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
 
                     const myLat = latitude
                     const myLng = longitude
 
                     const port_detail_modified = resonse[1].map((item, index) => {
                         const uniqueSlotsCount = removeDuplicatesAndFilter(item.bookings.flatMap(bookingItem => {
-                            const startMoment = moment(bookingItem.start_time, 'h:mm A').tz(time_zone);
-                            const endMoment = moment(bookingItem.end_time, 'h:mm A').tz(time_zone);
+                            const startMoment = moment(bookingItem.start_time, 'h:mm A');
+                            const endMoment = moment(bookingItem.end_time, 'h:mm A');
                             return [...slots, ...generateSlots(startMoment, endMoment, false)];
                         }) , currentTime).length;
                     
@@ -350,7 +349,7 @@ const portSlots = async (req, res) => {
             return res.status(200).json({ error: 'Both station id and port id are required.' });
         }
 
-        const fetchBookingEntries = await Booking.find({ station_id, port_id, date: moment(new Date()).tz(time_zone).format(DATE_FORMATE) });
+        const fetchBookingEntries = await Booking.find({ station_id, port_id, date: moment(new Date()).format(DATE_FORMATE) });
 
         if (fetchBookingEntries.length > 0) {
 
@@ -391,8 +390,8 @@ const portSlots = async (req, res) => {
                 const distanceInKm = calculateDistance(myLat, myLng, lat, lng);
 
 
-                const startMoment = moment(resonse?.start_time, 'h:mm A').tz(time_zone);
-                const endMoment = moment(resonse?.end_time, 'h:mm A').tz(time_zone);
+                const startMoment = moment(resonse?.start_time, 'h:mm A');
+                const endMoment = moment(resonse?.end_time, 'h:mm A');
 
                 if (!startMoment.isValid() || !endMoment.isValid()) {
                     return res.status(200).json({ error: 'Invalid time format. Please use h:mm A format.' });
@@ -402,20 +401,20 @@ const portSlots = async (req, res) => {
 
 
                     // const fetch_start_and_end_time = [{start_time : '2:00 PM' , end_time : "5:00 PM"}]
-                    const currentTime = moment().tz(time_zone); // Get the current time
-                    const currentMoment = moment(currentTime, 'h:mm A').tz(time_zone);
+                    const currentTime = moment(); // Get the current time
+                    const currentMoment = moment(currentTime, 'h:mm A');
 
 
                     fetch_start_and_end_time.forEach(({ start_time, end_time }) => {
                         // Convert start_time and end_time to moment objects for easier comparison
-                        const startTime = moment(start_time, 'h:mm A').tz(time_zone);
-                        const endTime = moment(end_time, 'h:mm A').tz(time_zone);
+                        const startTime = moment(start_time, 'h:mm A');
+                        const endTime = moment(end_time, 'h:mm A');
 
                         // Check if the current time is before the station's end time
                         if (currentTime.isBefore(endTime)) {
                             // Iterate through each slot and check for overlap
                             slots.forEach(slot => {
-                                const slotTime = moment(slot.time, 'h:mm A').tz(time_zone);
+                                const slotTime = moment(slot.time, 'h:mm A');
 
                                 // Check if slotTime is between startTime and endTime and is after the current time
                                 if (slotTime.isBetween(startTime, endTime, null, '[]') && slotTime.isAfter(currentTime)) {
@@ -427,7 +426,7 @@ const portSlots = async (req, res) => {
 
 
                     // Filter the slots based on the current time
-                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').tz(time_zone).isAfter(currentMoment));
+                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
                     const data = {
                         station_detail: {
                             ...resonse?.toObject(),
@@ -479,20 +478,20 @@ const portSlots = async (req, res) => {
                 const distanceInKm = calculateDistance(myLat, myLng, lat, lng);
 
 
-                const startMoment = moment(resonse?.start_time, 'h:mm A').tz(time_zone);
-                const endMoment = moment(resonse?.end_time, 'h:mm A').tz(time_zone);
+                const startMoment = moment(resonse?.start_time, 'h:mm A');
+                const endMoment = moment(resonse?.end_time, 'h:mm A');
 
                 if (!startMoment.isValid() || !endMoment.isValid()) {
                     return res.status(200).json({ error: 'Invalid time format. Please use h:mm A format.' });
                 } else {
                     const slots = generateSlots(startMoment, endMoment, false);
 
-                    const currentTime = moment().tz(time_zone); // Get the current time
+                    const currentTime = moment(); // Get the current time
 
-                    const currentMoment = moment(currentTime, 'h:mm A').tz(time_zone);
+                    const currentMoment = moment(currentTime, 'h:mm A');
 
                     // Filter the slots based on the current time
-                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').tz(time_zone).isAfter(currentMoment));
+                    const filteredSlots = slots.filter(slot => moment(slot.time, 'h:mm A').isAfter(currentMoment));
                     console.log('filteredSlots' , filteredSlots)
                     const data = {
                         station_detail: {
@@ -528,7 +527,7 @@ const portSlotReservation = async (req, res) => {
 
         // Fetch booking entries and station information in parallel
         const [fetchBookingEntries, response , port] = await Promise.all([
-            Booking.find({ station_id, port_id, date: moment(new Date()).tz(time_zone).format(DATE_FORMATE) }),
+            Booking.find({ station_id, port_id, date: moment(new Date()).format(DATE_FORMATE) }),
             Station.findOne({ _id: station_id }),
             Port.findOne({ _id: port_id }),
         ]);
@@ -541,8 +540,8 @@ const portSlotReservation = async (req, res) => {
                 }));
 
                 if (response) {
-                    const startMoment = moment(response.start_time, 'h:mm A').tz(time_zone);
-                    const endMoment = moment(response.end_time, 'h:mm A').tz(time_zone);
+                    const startMoment = moment(response.start_time, 'h:mm A');
+                    const endMoment = moment(response.end_time, 'h:mm A');
 
                     if (!startMoment.isValid() || !endMoment.isValid()) {
                         return res.status(200).json({ status: false, message: 'Invalid time format. Please use h:mm A format.' });
@@ -552,11 +551,11 @@ const portSlotReservation = async (req, res) => {
 
                     // Use Promise.all to parallelize the slot booking check
                     await Promise.all(fetch_start_and_end_time.map(({ start_time, end_time }) => {
-                        const startTime = moment(start_time, 'h:mm A').tz(time_zone);
-                        const endTime = moment(end_time, 'h:mm A').tz(time_zone);
+                        const startTime = moment(start_time, 'h:mm A');
+                        const endTime = moment(end_time, 'h:mm A');
 
                         slots.forEach(slot => {
-                            const slotTime = moment(slot.time, 'h:mm A').tz(time_zone);
+                            const slotTime = moment(slot.time, 'h:mm A');
 
                             if (slotTime.isBetween(startTime, endTime, null, '[]')) {
                                 slot.isBooked = true;
@@ -567,10 +566,10 @@ const portSlotReservation = async (req, res) => {
 
                     
                     const isAnySlotBooked = slots.some(slot => {
-                        const slotTime = moment(slot.time, 'h:mm A').tz(time_zone);
+                        const slotTime = moment(slot.time, 'h:mm A');
                         
                         // Iterate through each minute within the specified time range
-                        for (let currentTime = moment(start_time, 'h:mm A').tz(time_zone); currentTime.isBefore(moment(end_time, 'h:mm A').tz(time_zone)); currentTime.add(1, 'minutes')) {
+                        for (let currentTime = moment(start_time, 'h:mm A'); currentTime.isBefore(moment(end_time, 'h:mm A')); currentTime.add(1, 'minutes')) {
                             // Check if the slot is booked at the current minute
                             if (slotTime.isSame(currentTime, 'minute') && slot.isBooked) {
                                 return true; // Booked slot found at the current minute
@@ -589,8 +588,8 @@ const portSlotReservation = async (req, res) => {
 
                     res.status(200).json({ status: !isAnySlotBooked, data, message: statusMessage });
                 } else {
-                    const startMoment = moment(response.start_time, 'h:mm A').tz(time_zone);
-                    const endMoment = moment(response.end_time, 'h:mm A').tz(time_zone);
+                    const startMoment = moment(response.start_time, 'h:mm A');
+                    const endMoment = moment(response.end_time, 'h:mm A');
 
                     if (!startMoment.isValid() || !endMoment.isValid()) {
                         return res.status(200).json({ status: false, message: 'Invalid time format. Please use h:mm A format.' });
@@ -600,11 +599,11 @@ const portSlotReservation = async (req, res) => {
 
                     // Use Promise.all to parallelize the slot booking check
                     await Promise.all(fetch_start_and_end_time.map(({ start_time, end_time }) => {
-                        const startTime = moment(start_time, 'h:mm A').tz(time_zone);
-                        const endTime = moment(end_time, 'h:mm A').tz(time_zone);
+                        const startTime = moment(start_time, 'h:mm A');
+                        const endTime = moment(end_time, 'h:mm A');
 
                         slots.forEach(slot => {
-                            const slotTime = moment(slot.time, 'h:mm A').tz(time_zone);
+                            const slotTime = moment(slot.time, 'h:mm A');
 
                             if (slotTime.isBetween(startTime, endTime, null, '[]')) {
                                 slot.isBooked = true;
@@ -614,10 +613,10 @@ const portSlotReservation = async (req, res) => {
 
 
                     const isAnySlotBooked = slots.some(slot => {
-                        const slotTime = moment(slot.time, 'h:mm A').tz(time_zone);
+                        const slotTime = moment(slot.time, 'h:mm A');
                         
                         // Iterate through each minute within the specified time range
-                        for (let currentTime = moment(start_time, 'h:mm A').tz(time_zone); currentTime.isBefore(moment(end_time, 'h:mm A').tz(time_zone)); currentTime.add(1, 'minutes')) {
+                        for (let currentTime = moment(start_time, 'h:mm A'); currentTime.isBefore(moment(end_time, 'h:mm A')); currentTime.add(1, 'minutes')) {
                             // Check if the slot is booked at the current minute
                             if (slotTime.isSame(currentTime, 'minute') && slot.isBooked) {
                                 return true; // Booked slot found at the current minute
@@ -852,8 +851,8 @@ const transactionSuccessfully =async (req, res) => {
             return res.status(200).json({ status: false, message: 'All fields are required.' });
         } else {
 
-            const startMoment = moment(start_time, 'h:mm A').tz(time_zone);
-            const endMoment = moment(end_time, 'h:mm A').tz(time_zone);
+            const startMoment = moment(start_time, 'h:mm A');
+            const endMoment = moment(end_time, 'h:mm A');
 
             if (!startMoment.isValid() || !endMoment.isValid()) {
                 return res.status(200).json({ status: false, message: 'Invalid time format. Please use h:mm A format.' });
@@ -944,7 +943,7 @@ const bookingHistory =async (req, res) => {
 // Function to check and log bookings
 const checkBookings = async () => {
     try {
-        const currentDateTime = moment(new Date()).tz(time_zone);
+        const currentDateTime = moment(new Date());
         const newDateTime = currentDateTime.add(7, 'minutes');
         console.log('newDateTime' , currentDateTime.format('hh:mm A'))
 
@@ -952,7 +951,7 @@ const checkBookings = async () => {
                 {
                     $match: {
                         start_time:  currentDateTime.format('hh:mm A'),
-                        date : moment(new Date()).tz(time_zone).format(DATE_FORMATE)
+                        date : moment(new Date()).format(DATE_FORMATE)
                     }
                 },
                 {
@@ -1093,7 +1092,7 @@ function removeDuplicatesAndFilter(array, currentTime) {
     const uniqueObjects = array.filter(obj => {
         const { time } = obj;
         const key = time;
-        return timeOccurrences.get(key) === 1 && moment(time, 'h:mm A').tz(time_zone).isAfter(moment(currentTime, 'h:mm A').tz(time_zone));
+        return timeOccurrences.get(key) === 1 && moment(time, 'h:mm A').isAfter(moment(currentTime, 'h:mm A'));
     });
 
     return uniqueObjects;
@@ -1113,8 +1112,8 @@ function generateSlots(startMoment, endMoment, isBooked) {
 
 function hourConvertIntoMinute(per_min_unit, start_time, end_time) {
     // Convert start_time and end_time to moment objects
-    const startTime = moment(start_time, 'h:mm A').tz(time_zone);
-    const endTime = moment(end_time, 'h:mm A').tz(time_zone);
+    const startTime = moment(start_time, 'h:mm A');
+    const endTime = moment(end_time, 'h:mm A');
 
     // Calculate the time difference in minutes
     const timeDifferenceInMinutes = endTime.diff(startTime, 'minutes');
