@@ -32,7 +32,10 @@ const {
   cancelBooking,
   changePassword,
   verifyEmail,
-  forgetPassword
+  forgetPassword,
+  subAdminRegister,
+  subAdminList,
+  editAdminRole
 } = require('../controllers/admin');
 const headerMiddleware = require('../middlewares/headerMiddleware');
 
@@ -102,6 +105,12 @@ router.post("/registration_otp_verfication", upload, registerationOtpVerificatio
 router.post("/change_password", upload, changePassword);
 router.post("/verify_email", upload, verifyEmail);
 router.post("/forget_password", upload, forgetPassword);
+
+// sub admin
+
+router.post("/sub_admin_register", upload_single, subAdminRegister);
+router.post("/sub_admin_list", upload_single, subAdminList);
+router.post("/edit_sub_admin_role", upload, editAdminRole);
 
 
 // admin profile 

@@ -17,9 +17,24 @@ const adminUserSchema = new mongoose.Schema({
         required: true,
         trim: true,
     },
+    admin_id: {
+        type: String,
+        trim: true,
+        default : null
+    },
+    role_id: {
+        type: String,
+        trim: true,
+        default : null
+    },
     profile_image: {
         type: String,
         default: null,
+        trim: true,
+    },
+    permissions: {
+        type: Object,
+        default: {},
         trim: true,
     },
     created_at: {

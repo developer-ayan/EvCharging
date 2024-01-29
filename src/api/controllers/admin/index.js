@@ -24,7 +24,7 @@ const mongoose = require('mongoose')
 const OneSignal = require('onesignal-node')
 
 // helper functions
-const { delete_file, sendNotification } = require('../../../utils/helpers')
+const { delete_file, sendNotification, sendEmail } = require('../../../utils/helpers')
 const Booking = require('../../models/logged-in/booking')
 const Wallet = require('../../models/logged-in/wallet')
 const Transaction = require('../../models/logged-in/transaction')
@@ -293,8 +293,6 @@ const stationDetail = async (req, res) => {
     }
 };
 
-
-
 const stationList = async (req, res) => {
     try {
         const stations = await Station.find({}).sort({ _id: -1 }).exec()
@@ -512,6 +510,8 @@ const register = async (req, res) => {
             name
         } = req.body;
 
+        const randomFourDigitNumber = Math.floor(Math.random() * 9000) + 1000;
+
         if (!email || !password || !name) {
             return res.status(200).json({
                 status: false,
@@ -549,6 +549,130 @@ const register = async (req, res) => {
     }
 }
 
+const subAdminRegister = async (req, res) => {
+    try {
+        const {
+            email,
+            password,
+            name,
+            admin_id,
+            role_id
+        } = req.body;
+
+        if (!email || !password || !name || !admin_id || !role_id) {
+            return res.status(200).json({
+                status: false,
+                message: 'All fields are required'
+            });
+        }
+
+        const existingEmailUser = await AdminUsers.findOne({
+            email
+        });
+
+        if (existingEmailUser) {
+            return res.status(200).json({
+                status: false,
+                message: 'Email already exists'
+            });
+        }else{
+            const user = await AdminUsers.create({
+                email,
+                password,
+                name,
+                admin_id,
+                role_id,
+                profile_image : req.file.filename || null
+            });
+            res.status(200).json({
+                status: true,
+                data: user,
+                message: 'User registered successfully'
+            });
+        }
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
+
+const subAdminList = async (req, res) => {
+    try {
+        const find = await AdminUsers.find({ email: { $ne: 'admin@gmail.com' } }).sort({ _id: -1 }).exec();
+        res.status(200).json({
+            status: true,
+            data: find,
+            message: 'Sub admin fetch successfully.'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(200).json({
+            status: false,
+            message: 'Internal Server Error'
+        });
+    }
+}
+
+const editAdminRole = async (req, res) => {
+    try {
+
+        const {
+            _id,
+            permissions,
+            role_id,
+        } = req.body;
+        if (!_id || !permissions || !role_id ) {
+            return res.status(200).json({
+                status: false,
+                message: 'All fields are required!'
+            });
+        }else{
+
+        const user = await AdminUsers.findOne({
+            _id
+        });
+        if (!user) {
+            return res.status(200).json({
+                status: false,
+                message: 'User not found'
+            });
+        } else {
+            const existingUsers = await AdminUsers.findOne({_id});
+            if (!existingUsers) {
+                return res.status(200).json({
+                    status: false,
+                    message: 'User not found!'
+                });
+            } else {
+                user.role_id = role_id || user.role_id;
+                user.permissions = permissions || user.permissions;
+
+                const updatedRole = await user.save();
+                if (updatedRole) {
+                    res.status(200).json({
+                        status: true,
+                        message: 'User role update successfully'
+                    });
+                } else {
+                    res.status(200).json({
+                        status: false,
+                        message: 'Something went wrong!'
+                    });
+                }
+            }
+        }
+    }
+
+    } catch (error) {
+        res.status(200).json({
+            status: false,
+            message: error.message
+        });
+    }
+}
+
 const registerationOtpVerification = async (req, res) => {
     try {
         const randomFourDigitNumber = Math.floor(Math.random() * 9000) + 1000;
@@ -568,6 +692,7 @@ const registerationOtpVerification = async (req, res) => {
                 message: 'Email already exists'
             });
         } else {
+            // sendEmail()
             return res.status(200).json({
                 status: true,
                 data: {
@@ -1988,6 +2113,8 @@ module.exports = {
     fetchRadius,
     stationReviews,
     users,
+    subAdminRegister,
+    subAdminList,
     userFetchDetail,
     userEditDetail,
     createCountryCode,
@@ -2017,5 +2144,6 @@ module.exports = {
     deleteUser,
     changePassword,
     verifyEmail,
-    forgetPassword
+    forgetPassword,
+    editAdminRole
 };
