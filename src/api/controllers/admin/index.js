@@ -1068,24 +1068,26 @@ const users = async (req, res) => {
             {
                 $lookup: {
                     from: "country_codes",
-                    let: { country_code_id: { $toString: "$country_code_id" } },
+                    let: { countryId:  "$country_code_id" },
                     pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $eq: ["$_id", "$$country_code_id"]
-                                }
-                            }
+                      {
+                        $match: {
+                          $expr: { $eq: [{ $toString: "$_id" } , "$$countryId"] }
                         }
+                      }
                     ],
-                    as: "country_code"
-                },
+                    as: "country"
+                  },
             },
           ]).exec();
+
+          const modified_array = users.map((item , index) => {
+            return {...item , phone : (item.country?.[0]?.country_code || '') +   item.phone}
+          })
         
         res.status(200).json({
             status: true,
-            data: users,
+            data: modified_array,
             message: 'Users fetch successfully.'
         });
     } catch (error) {
