@@ -24,6 +24,11 @@ const transactionSchema = new mongoose.Schema({
         trim: true,
         default: 0,
     },
+    in_progress: {
+        type: String,
+        trim: true,
+        default: false,
+    },
     station_id: {
         type: String,
         trim: true,

@@ -35,9 +35,11 @@ const {
   forgetPassword,
   subAdminRegister,
   subAdminList,
-  editAdminRole
+  editAdminRole,
+  createEnvironmentVariables
 } = require('../controllers/admin');
 const headerMiddleware = require('../middlewares/headerMiddleware');
+const EnvironmentVariable = require('../models/admin/environment-variable');
 
 // Destination folder
 const destinationFolder = './uploads/station_images/';
@@ -149,5 +151,9 @@ router.post("/edit_user_detail", upload_single, userEditDetail);
 
 // booking
 router.post("/cancel_booking", upload_single, cancelBooking);
+
+// environment variables
+router.post("/environment_variable", upload_single, createEnvironmentVariables);
+
 
 module.exports = router;

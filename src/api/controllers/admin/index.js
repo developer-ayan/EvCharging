@@ -32,6 +32,7 @@ const {
 const Booking = require("../../models/logged-in/booking");
 const Wallet = require("../../models/logged-in/wallet");
 const Transaction = require("../../models/logged-in/transaction");
+const EnvironmentVariable = require("../../models/admin/environment-variable");
 
 const login = async (req, res) => {
   try {
@@ -2059,6 +2060,49 @@ const pushNotification = async (req, res) => {
   }
 };
 
+const createEnvironmentVariables = async (req, res) => {
+  try {
+    const { minimun_amount_for_charging } = req.body;
+
+    // Check for missing fields
+    if (!minimun_amount_for_charging) {
+      return res.status(200).json({
+        status: false,
+        message: "All fields are required",
+      });
+    } else {
+      const find = await EnvironmentVariable.find({});
+
+      if (find.length > 0) {
+        return res.status(200).json({
+          status: false,
+          message: "Environment variables is already exist",
+        });
+      } else {
+        const faqsCreate = await EnvironmentVariable.create({
+          minimun_amount_for_charging,
+        });
+        if (faqsCreate) {
+          res.status(200).json({
+            status: true,
+            message: "Environment variables created successfully",
+          });
+        } else {
+          res.status(200).json({
+            status: false,
+            message: "Failed to create Environment variables",
+          });
+        }
+      }
+    }
+  } catch (error) {
+    res.status(200).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
   login,
   createStation,
@@ -2113,4 +2157,5 @@ module.exports = {
   verifyEmail,
   forgetPassword,
   editAdminRole,
+  createEnvironmentVariables,
 };

@@ -44,6 +44,11 @@ const bookingSchema = new mongoose.Schema({
         trim: true,
         default: 'pending',
     },
+    in_progress: {
+        type: String,
+        trim: true,
+        default: false,
+    },
     date: {
         type: String,
         trim: true,

@@ -18,20 +18,19 @@ const {
     bookingHistory,
     stationQrCode,
     fetchNotification,
-    readNotification
+    readNotification,
+    chargingStart
  } = require('../controllers/logged-in');
 
 // Stations 
 router.post("/dashboard_stations", upload, dashboardStations);
 router.post("/station_detail", upload, stationDetail);
 router.post("/search_station", upload, searchStation);
-router.post("/station_qr_code", upload,  stationQrCode);
 router.post("/send_station_review", upload, sendStationReview);
 
 // Port slots
 router.post("/port_slots", upload, portSlots);
 router.post("/port_slot_reservation", upload, portSlotReservation);
-router.post("/booking_port", upload, bookingPort);
 
 // Wallet
 router.post("/wallet", upload, wallet);
@@ -44,5 +43,10 @@ router.post("/booking_history", upload,  bookingHistory);
 // notification
 router.post("/fetch_notification", upload,  fetchNotification);
 router.post("/read_notification", upload,  readNotification);
+
+// scan module
+router.post("/station_qr_code", upload,  stationQrCode);
+router.post("/port_charging_start", upload,  chargingStart);
+
 
 module.exports = router;
