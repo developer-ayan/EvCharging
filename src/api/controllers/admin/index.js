@@ -334,9 +334,9 @@ const createStationPort = async (req, res) => {
         unit_price,
         port_name,
         port_description,
-        port_image: req.file ? req.file.filename : null,
         charger_id,
-        connector_id
+        connector_id,
+        port_image: req.file ? req.file.filename : null,
       });
       res.status(200).json({
         status: true,
@@ -353,8 +353,15 @@ const createStationPort = async (req, res) => {
 
 const editStationPort = async (req, res) => {
   try {
-    const { _id, port_type, unit_price, port_name, port_description } =
-      req.body;
+    const {
+      _id,
+      port_type,
+      unit_price,
+      port_name,
+      port_description,
+      charger_id,
+      connector_id,
+    } = req.body;
     if (!_id) {
       return res.status(200).json({
         status: false,
@@ -374,6 +381,8 @@ const editStationPort = async (req, res) => {
       port.unit_price = unit_price || port.unit_price;
       port.port_name = port_name || port.port_name;
       port.port_description = port_description || port.port_description;
+      port.charger_id = charger_id || port.charger_id;
+      port.connector_id = connector_id || port.connector_id;
       if (req.file) {
         delete_file("/uploads/port_images/", port.port_image);
         port.port_image = req.file.filename;
@@ -1006,13 +1015,11 @@ const stationReviews = async (req, res) => {
         .sort({ _id: -1 })
         .exec();
       if (stationRating) {
-        return res
-          .status(200)
-          .json({
-            status: true,
-            data: stationRating,
-            message: "Review fetch successfully.",
-          });
+        return res.status(200).json({
+          status: true,
+          data: stationRating,
+          message: "Review fetch successfully.",
+        });
       } else {
         return res
           .status(200)
