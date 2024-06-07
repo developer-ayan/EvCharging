@@ -1354,90 +1354,152 @@ const chargingStart = async (req, res) => {
         .status(400)
         .json({ status: false, message: "All fields are required." });
     } else {
-      const environmentVariables = await EnvironmentVariable.findOne({});
-      if (!environmentVariables) {
-        return res.status(500).json({
+      const check_charging_port_status = await Booking.findOne({
+        in_progress: true,
+        charger_id,
+        connector_id,
+      });
+
+      if (check_charging_port_status) {
+        return res.status(200).json({
           status: false,
-          message:
-            "Please set the minimum amount variable and inform the admin.",
+          message: "Is the charger already in the process of charging",
         });
-      }
+      } else {
+        const environmentVariables = await EnvironmentVariable.findOne({});
+        if (!environmentVariables) {
+          return res.status(200).json({
+            status: false,
+            message:
+              "Please set the minimum amount variable and inform the admin.",
+          });
+        }
 
-      const minimumAmount = parseFloat(
-        environmentVariables.minimun_amount_for_charging
-      );
-      const findWallet = await Wallet.findOne({ user_id });
+        const minimumAmount = parseFloat(
+          environmentVariables.minimun_amount_for_charging
+        );
+        const findWallet = await Wallet.findOne({ user_id });
 
-      if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
-        return res.status(400).json({
-          status: false,
-          message: `Insufficient balance. Minimum amount required: ${minimumAmount}`,
-        });
-      }
+        if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
+          return res.status(400).json({
+            status: false,
+            message: `Insufficient balance. Minimum amount required: ${minimumAmount}`,
+          });
+        }
 
-      const checkCurrentStatus = await axios.get(
-        `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
-      );
+        const checkCurrentStatus = await axios.get(
+          `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
+        );
 
-      switch (checkCurrentStatus.data.status) {
-        case "Available":
-          // Proceed with charging
-          // Making Axios request
+        switch (checkCurrentStatus.data.status) {
+          case "Available":
+            // Proceed with charging
+            // Making Axios request
 
-          const response = await axios.get(
-            `http://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
-          );
-          if (response.status === 200) {
-            await Booking.create({
-              user_id,
-              station_id,
-              port_id,
-              account_type: "WL",
-              status: "success",
-              in_progress: true,
-            });
-            // Success
-            res.status(200).json({
-              status: true,
-              message: "You have started charging.",
-            });
-          } else {
-            // Handle unsuccessful response
+            const response = await axios.get(
+              `http://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
+            );
+            if (response.status === 200) {
+              await Booking.create({
+                user_id,
+                station_id,
+                port_id,
+                account_type: "WL",
+                status: "success",
+                in_progress: true,
+                charger_id,
+                connector_id,
+              });
+              // Success
+              res.status(200).json({
+                status: true,
+                message: "You have started charging.",
+              });
+            } else {
+              // Handle unsuccessful response
+              res.status(200).json({
+                status: false,
+                message: "Failed to fetch wallet data.",
+              });
+            }
+            break;
+          case "Preparing":
             res.status(200).json({
               status: false,
-              message: "Failed to fetch wallet data.",
+              message: "Preparing for charging.",
             });
-          }
-          break;
-        case "Preparing":
-          res.status(200).json({
-            status: false,
-            message: "Preparing for charging.",
-          });
-          break;
-        case "Charging":
-          res.status(200).json({
-            status: false,
-            message: "Charging in progress.",
-          });
-          break;
-        case "Finishing":
-          res.status(200).json({
-            status: false,
-            message: "Charging finished.",
-          });
-          break;
-        default:
-          res.status(200).json({
-            status: false,
-            message: "Unknown status.",
-          });
-          break;
+            break;
+          case "Charging":
+            res.status(200).json({
+              status: false,
+              message: "Charging in progress.",
+            });
+            break;
+          case "Finishing":
+            res.status(200).json({
+              status: false,
+              message: "Charging finished.",
+            });
+            break;
+          default:
+            res.status(200).json({
+              status: false,
+              message: "Unknown status.",
+            });
+            break;
+        }
       }
     }
   } catch (error) {
     console.error(error);
     res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+const chargingStop = async (req, res) => {
+  try {
+    const { charger_id, connector_id } = req.body;
+    if (!charger_id || !connector_id) {
+      return res.status(400).json({
+        status: false,
+        message: "charger_id and connector_id is required.",
+      });
+    } else {
+      const check_charging_status = await Booking.findOne({
+        charger_id,
+        connector_id,
+        in_progress: true,
+      });
+      if (check_charging_status) {
+        const updatedBooking = await Booking.findOneAndUpdate(
+          { charger_id, connector_id, in_progress: true },
+          { $set: { in_progress: false } },
+          { new: true }
+        );
+        if (updatedBooking) {
+          res.status(200).json({
+            status: true,
+            message: `We have stopped your charging.`,
+          });
+        } else {
+          res.status(200).json({
+            status: true,
+            message: `We can't update your status. There's an issue with this record`,
+          });
+        }
+      } else {
+        res.status(200).json({
+          status: false,
+          message: `Charger and connector aren't being used for charging, so you can't stop it.`,
+        });
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(200).json({
       status: false,
       message: "Internal Server Error",
     });
@@ -1594,6 +1656,7 @@ module.exports = {
   bookingHistory,
   stationQrCode,
   chargingStart,
+  chargingStop,
   fetchNotification,
   readNotification,
 };
