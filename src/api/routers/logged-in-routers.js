@@ -38,8 +38,9 @@ router.post("/wallet", upload, wallet);
 router.post("/transaction", upload, transaction)
 router.post("/transaction_successfully", upload, transactionSuccessfully);
 
-// booking history
+// booking
 router.post("/booking_history", upload,  bookingHistory);
+router.post("/booking_port", upload, bookingPort);
 
 // notification
 router.post("/fetch_notification", upload,  fetchNotification);
