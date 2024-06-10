@@ -1409,6 +1409,7 @@ const chargingStart = async (req, res) => {
                 in_progress: true,
                 charger_id,
                 connector_id,
+                start_time: moment(new Date()).format('hh:mm A')
               });
               // Success
               res.status(200).json({
@@ -1474,11 +1475,26 @@ const chargingStop = async (req, res) => {
         in_progress: true,
       });
       if (check_charging_status) {
+        const port_data = await Port.findOne({
+          _id: check_charging_status?.port_id,
+        });
         const updatedBooking = await Booking.findOneAndUpdate(
           { charger_id, connector_id, in_progress: true },
-          { $set: { in_progress: false } },
+          {
+            $set: {
+              in_progress: false, end_time: moment(new Date()).format('hh:mm A'), amount: hourConvertIntoMinute(
+                port_data?.unit_price,
+                check_charging_status?.start_time,
+                moment(new Date()).format('hh:mm A')
+              )
+            }
+          },
           { new: true }
         );
+
+
+
+
         if (updatedBooking) {
           res.status(200).json({
             status: true,
@@ -1633,9 +1649,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c; // Distance in kilometers
 
