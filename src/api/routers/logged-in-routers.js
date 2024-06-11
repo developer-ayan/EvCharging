@@ -20,7 +20,8 @@ const {
     fetchNotification,
     readNotification,
     chargingStart,
-    chargingStop
+    chargingStop,
+    chargingValues
  } = require('../controllers/logged-in');
 
 // Stations 
@@ -49,6 +50,7 @@ router.post("/read_notification", upload,  readNotification);
 router.post("/station_qr_code", upload,  stationQrCode);
 router.post("/port_charging_start", upload,  chargingStart);
 router.post("/port_charging_stop", upload,  chargingStop);
+router.post("/port_charging_values", upload,  chargingValues);
 
 
 module.exports = router;

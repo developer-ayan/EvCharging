@@ -372,11 +372,11 @@ const sendStationReview = async (req, res) => {
     if (!station_id) {
       return res
         .status(200)
-        .json({ status: true, data: [], message: "station_id is required" });
+        .json({ status: false, data: [], message: "station_id is required" });
     } else if (!rating) {
       return res
         .status(200)
-        .json({ status: true, data: [], message: "rating is required" });
+        .json({ status: false, data: [], message: "rating is required" });
     } else {
       const ratingSend = await Rating.create({
         station_id,
@@ -1474,6 +1474,7 @@ const chargingStop = async (req, res) => {
         in_progress: true,
       });
       if (check_charging_status) {
+        const port_find = p;
         const updatedBooking = await Booking.findOneAndUpdate(
           { charger_id, connector_id, in_progress: true },
           { $set: { in_progress: false } },
@@ -1503,6 +1504,67 @@ const chargingStop = async (req, res) => {
       status: false,
       message: "Internal Server Error",
     });
+  }
+};
+
+const chargingValues = async (req, res) => {
+  try {
+    const { charger_id, connector_id } = req.body;
+    if (!charger_id || !connector_id) {
+      return res
+        .status(200)
+        .json({ status: false, message: "All fields are required" });
+    } else {
+      const check_charging_status = await Booking.findOne({
+        charger_id,
+        connector_id,
+        in_progress: true,
+      });
+      const find_port = await Port.findOne({
+        _id: check_charging_status?.port_id,
+      });
+      if (find_port) {
+        if (check_charging_status) {
+          const response = await axios.get(
+            `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
+          );
+          if (response?.data?.payload?.meterValue) {
+            const meterValue = response?.data?.payload?.meterValue;
+            const units = meterValue[0]?.sampledValue?.[0];
+            const percentage = meterValue[0]?.sampledValue?.[3];
+            const total_cost = hourConvertIntoMinute(
+              find_port.unit_price,
+              check_charging_status?.start_time,
+              moment(new Date()).format("hh:mm A")
+            );
+
+            const data = { units, percentage, total_cost };
+            return res.status(200).json({
+              status: true,
+              data,
+              message: "Send review successfully.",
+            });
+          } else {
+            return res
+              .status(200)
+              .json({ status: false, message: "Charging values not found!" });
+          }
+        } else {
+          return res
+            .status(200)
+            .json({ status: false, message: "Something went wrong!" });
+        }
+      } else {
+        return res
+          .status(200)
+          .json({ status: false, message: "Port not found!" });
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(200)
+      .json({ status: false, message: "Internal Server Error" });
   }
 };
 
@@ -1657,6 +1719,7 @@ module.exports = {
   stationQrCode,
   chargingStart,
   chargingStop,
+  chargingValues,
   fetchNotification,
   readNotification,
 };
