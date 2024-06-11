@@ -1391,6 +1391,8 @@ const chargingStart = async (req, res) => {
           `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
         );
 
+
+
         switch (checkCurrentStatus.data.status) {
           case "Available":
             // Proceed with charging
@@ -1446,6 +1448,7 @@ const chargingStart = async (req, res) => {
             res.status(200).json({
               status: false,
               message: "Unknown status.",
+              checkCurrentStatus
             });
             break;
         }
@@ -1482,7 +1485,26 @@ const chargingStop = async (req, res) => {
           `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
         );
         const chargingStop = await axios.get(`http://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${charger_id}&transactionID=${currentValues?.data.payload?.transactionId}`);
-
+        const findWallet = await Wallet.findOne({ user_id });
+        const wallet_balance = Number(findWallet?.amount) - Number(hourConvertIntoMinute(
+          port_data?.unit_price,
+          check_charging_status?.start_time,
+          moment(new Date()).format('hh:mm A')
+        ));
+        const updatedWallet = await Wallet.updateOne(
+          { user_id: check_charging_status?.user_id },
+          { $set: { amount: wallet_balance } }
+        );
+        const transaction = await Transaction.create({
+          user_id: check_charging_status?.user_id,
+          station_id: check_charging_status?.station_id,
+          amount: hourConvertIntoMinute(
+            port_data?.unit_price,
+            check_charging_status?.start_time,
+            moment(new Date()).format('hh:mm A')
+          ),
+          credit_or_debit: "DB",
+        });
         const updatedBooking = await Booking.findOneAndUpdate(
           { charger_id, connector_id, in_progress: true },
           {
