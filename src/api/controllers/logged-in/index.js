@@ -1467,87 +1467,112 @@ const chargingStop = async (req, res) => {
   try {
     const { charger_id, connector_id } = req.body;
     if (!charger_id || !connector_id) {
-      return res.status(400).json({
+      return res.status(200).json({
         status: false,
-        message: "charger_id and connector_id is required.",
+        message: "charger_id and connector_id are required.",
       });
-    } else {
-      const check_charging_status = await Booking.findOne({
-        charger_id,
-        connector_id,
-        in_progress: true,
+    }
+
+    const check_charging_status = await Booking.findOne({
+      charger_id,
+      connector_id,
+      in_progress: true,
+    });
+
+    if (!check_charging_status) {
+      return res.status(200).json({
+        status: false,
+        message: "Charger and connector aren't being used for charging, so you can't stop it.",
       });
-      if (check_charging_status) {
-        const port_data = await Port.findOne({
-          _id: check_charging_status?.port_id,
-        });
-        const currentValues = await axios.get(
-          `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
-        );
-        const chargingStop = await axios.get(`http://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${charger_id}&transactionID=${currentValues?.data.payload?.transactionId}`);
-        const findWallet = await Wallet.findOne({ user_id });
-        const wallet_balance = Number(findWallet?.amount) - Number(hourConvertIntoMinute(
-          port_data?.unit_price,
-          check_charging_status?.start_time,
-          moment(new Date()).format('hh:mm A')
-        ));
-        const updatedWallet = await Wallet.updateOne(
-          { user_id: check_charging_status?.user_id },
-          { $set: { amount: wallet_balance } }
-        );
-        const transaction = await Transaction.create({
-          user_id: check_charging_status?.user_id,
-          station_id: check_charging_status?.station_id,
-          amount: hourConvertIntoMinute(
+    }
+
+    const port_data = await Port.findOne({
+      _id: check_charging_status?.port_id,
+    });
+
+    let currentValues;
+    let chargingStop;
+    try {
+      currentValues = await axios.get(
+        `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
+      );
+      res.status(200).json({
+        status: true,
+        message: "We have stopped your charging.",
+        // currentValues
+      });
+      // chargingStop = await axios.get(
+      //   `http://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${charger_id}&transactionID=${currentValues?.data.payload?.transactionId}`
+      // );
+    } catch (axiosError) {
+      return res.status(200).json({
+        status: false,
+        message: "Error stopping the charging process.",
+      });
+    }
+
+    const findWallet = await Wallet.findOne({ user_id: check_charging_status?.user_id });
+    const end_time = moment(new Date());
+    const amount = hourConvertIntoMinute(
+      port_data?.unit_price,
+      check_charging_status?.start_time,
+      end_time.format('hh:mm A')
+    );
+    const wallet_balance = Number(findWallet?.amount) - amount;
+
+    await Wallet.updateOne(
+      { user_id: check_charging_status?.user_id },
+      { $set: { amount: wallet_balance } }
+    );
+
+    await Transaction.create({
+      user_id: check_charging_status?.user_id,
+      station_id: check_charging_status?.station_id,
+      amount: hourConvertIntoMinute(
+        port_data?.unit_price,
+        check_charging_status?.start_time,
+        end_time.format('hh:mm A')
+      ),
+      credit_or_debit: "DB",
+    });
+
+    const updatedBooking = await Booking.findOneAndUpdate(
+      { charger_id, connector_id, in_progress: true },
+      {
+        $set: {
+          in_progress: false,
+          end_time: end_time.format('hh:mm A'),
+          transaction_id: currentValues?.data.payload?.transactionId,
+          amount : hourConvertIntoMinute(
             port_data?.unit_price,
             check_charging_status?.start_time,
-            moment(new Date()).format('hh:mm A')
+            end_time.format('hh:mm A')
           ),
-          credit_or_debit: "DB",
-        });
-        const updatedBooking = await Booking.findOneAndUpdate(
-          { charger_id, connector_id, in_progress: true },
-          {
-            $set: {
-              in_progress: false, end_time: moment(new Date()).format('hh:mm A'), transaction_id: currentValues?.data.payload?.transactionId, amount: hourConvertIntoMinute(
-                port_data?.unit_price,
-                check_charging_status?.start_time,
-                moment(new Date()).format('hh:mm A')
-              )
-            }
-          },
-          { new: true }
-        );
+        },
+      },
+      { new: true }
+    );
 
-
-
-
-        if (updatedBooking) {
-          res.status(200).json({
-            status: true,
-            message: `We have stopped your charging.`,
-          });
-        } else {
-          res.status(200).json({
-            status: true,
-            message: `We can't update your status. There's an issue with this record`,
-          });
-        }
-      } else {
-        res.status(200).json({
-          status: false,
-          message: `Charger and connector aren't being used for charging, so you can't stop it.`,
-        });
-      }
+    if (updatedBooking) {
+      res.status(200).json({
+        status: true,
+        message: "We have stopped your charging.",
+      });
+    } else {
+      res.status(200).json({
+        status: false,
+        message: "We can't update your status. There's an issue with this record.",
+      });
     }
   } catch (error) {
     console.error(error);
-    res.status(200).json({
+    res.status(500).json({
       status: false,
       message: "Internal Server Error",
     });
   }
 };
+
 
 const chargingValues = async (req, res) => {
   try {
