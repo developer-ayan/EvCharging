@@ -1543,7 +1543,7 @@ const chargingStop = async (req, res) => {
           in_progress: false,
           end_time: end_time.format('hh:mm A'),
           transaction_id: currentValues?.data.payload?.transactionId,
-          amount : hourConvertIntoMinute(
+          amount: hourConvertIntoMinute(
             port_data?.unit_price,
             check_charging_status?.start_time,
             end_time.format('hh:mm A')
@@ -1577,63 +1577,84 @@ const chargingStop = async (req, res) => {
 const chargingValues = async (req, res) => {
   try {
     const { charger_id, connector_id } = req.body;
+
+    // Validate input
     if (!charger_id || !connector_id) {
-      return res
-        .status(200)
-        .json({ status: false, message: "All fields are required" });
-    } else {
-      const check_charging_status = await Booking.findOne({
-        charger_id,
-        connector_id,
-        in_progress: true,
+      return res.status(200).json({
+        status: false,
+        message: "All fields are required",
       });
+    }
+
+    // Check charging status
+    const check_charging_status = await Booking.findOne({
+      charger_id,
+      connector_id,
+      in_progress: true,
+    });
+
+    if (!check_charging_status) {
+      return res.status(200).json({
+        status: false,
+        message: "Charging status not found",
+      });
+    } else {
+      // Find port details
       const find_port = await Port.findOne({
         _id: check_charging_status?.port_id,
       });
-      if (find_port) {
-        if (check_charging_status) {
-          const response = await axios.get(
-            `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
-          );
-          if (response?.data?.payload?.meterValue) {
-            const meterValue = response?.data?.payload?.meterValue;
-            const units = meterValue[0]?.sampledValue?.[0];
-            const percentage = meterValue[0]?.sampledValue?.[3];
-            const total_cost = hourConvertIntoMinute(
-              find_port.unit_price,
-              check_charging_status?.start_time,
-              moment(new Date()).format("hh:mm A")
-            );
 
-            const data = { units, percentage, total_cost };
-            return res.status(200).json({
-              status: true,
-              data,
-              message: "Send review successfully.",
-            });
-          } else {
-            return res
-              .status(200)
-              .json({ status: false, message: "Charging values not found!" });
-          }
-        } else {
-          return res
-            .status(200)
-            .json({ status: false, message: "Something went wrong!" });
-        }
-      } else {
-        return res
-          .status(200)
-          .json({ status: false, message: "Port not found!" });
+      if (!find_port) {
+        return res.status(200).json({
+          status: false,
+          message: "Port not found",
+        });
       }
+
+      // Fetch charging values from external server
+      const response = await axios.get(
+        `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=charz-test-1&connectorID=${connector_id}`
+      );
+      if (response?.data?.payload) {
+        console.log('response', response)
+
+        const meterValue = response?.data?.payload?.meterValue;
+
+        // Extract necessary values
+        const units = meterValue?.[0]?.sampledValue?.[0] || {};
+        const percentage = meterValue?.[0]?.sampledValue?.[3] || {};
+        const total_cost = hourConvertIntoMinute(
+          find_port.unit_price,
+          check_charging_status?.start_time,
+          moment(new Date()).format("hh:mm A")
+        );
+
+        // Prepare data
+        const data = { units, percentage, total_cost };
+
+        // Respond with the data
+        return res.status(200).json({
+          status: true,
+          response: data,
+          message: "Charging values retrieved successfully",
+        });
+      } else {
+        return res.status(200).json({
+          status: false,
+          message: response?.data?.message,
+        });
+      }
+
     }
   } catch (error) {
     console.error(error);
-    return res
-      .status(200)
-      .json({ status: false, message: "Internal Server Error" });
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
   }
 };
+
 
 const fetchNotification = async (req, res) => {
   try {
