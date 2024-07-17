@@ -25,6 +25,7 @@ const cron = require("node-cron");
 const { DATE_FORMATE } = require("../../../utils/urls");
 const { sendNotification } = require("../../../utils/helpers");
 const EnvironmentVariable = require("../../models/admin/environment-variable");
+const { default: mongoose } = require("mongoose");
 
 const dashboardStations = async (req, res) => {
   try {
@@ -1012,75 +1013,58 @@ const bookingPort = async (req, res) => {
 const wallet = async (req, res) => {
   try {
     const { user_id, account_type, transaction_id, amount } = req.body;
-    if (!user_id || !account_type || !transaction_id || !amount) {
-      return res
-        .status(200)
-        .json({ status: false, message: "All fields are required." });
+
+    // Check if all required fields are provided
+    if (!user_id || !account_type || !amount) {
+      return res.status(400).json({ status: false, message: "All fields are required." });
+    }
+
+    // Find if the wallet exists for the user
+    let findWallet = await Wallet.findOne({ user_id });
+
+    // If wallet exists, update the amount
+    if (findWallet) {
+      findWallet.amount = Number(findWallet.amount) + Number(amount);
     } else {
-      const findWallet = await Wallet.findOne({ user_id });
-      if (findWallet) {
-        const amountAdd = Number(findWallet.amount) + Number(amount);
-        findWallet.amount = amountAdd || findWallet.amount;
-        const updatedWallet = await findWallet.save();
-        if (updatedWallet) {
-          const transaction = await Transaction.create({
-            user_id,
-            transaction_id,
-            amount,
-            credit_or_debit: "CR",
-          });
-          if (transaction) {
-            return res.status(200).json({
-              status: true,
-              message: "Credit amount in your wallet successfully.",
-            });
-          } else {
-            return res.status(200).json({
-              status: false,
-              message: "Something issue from transaction",
-            });
-          }
-        } else {
-          return res
-            .status(200)
-            .json({ status: true, message: "Something went wrong!" });
-        }
-      } else {
-        const credit = await Wallet.create({
-          user_id,
-          account_type,
-          transaction_id,
-          amount,
-        });
-        if (credit) {
-          const transaction = await Transaction.create({
-            user_id,
-            transaction_id,
-            amount,
-            credit_or_debit: "CR",
-          });
-          if (transaction) {
-            return res.status(200).json({
-              status: true,
-              message: "Credit amount in your wallet successfully.",
-            });
-          } else {
-            return res.status(200).json({
-              status: false,
-              message: "Something issue from transaction",
-            });
-          }
-        } else {
-          return res
-            .status(200)
-            .json({ status: true, message: "Something went wrong!" });
-        }
-      }
+      // If wallet doesn't exist, create a new one
+      findWallet = await Wallet.create({
+        user_id,
+        account_type,
+        transaction_id,
+        amount,
+      });
+    }
+
+    // Save the wallet changes
+    const updatedWallet = await findWallet.save();
+
+    // Create a transaction record
+    const transaction = await Transaction.create({
+      user_id,
+      transaction_id,
+      amount,
+      credit_or_debit: "CR",
+    });
+
+    // Check if transaction and wallet update were successful
+    if (updatedWallet && transaction) {
+      return res.status(200).json({
+        status: true,
+        message: "Credit amount in your wallet successfully.",
+      });
+    } else {
+      return res.status(500).json({
+        status: false,
+        message: "Something went wrong!",
+      });
     }
   } catch (error) {
-    res.status(200).json({ status: false, message: error.message });
+    res.status(500).json({ status: false, message: error.message });
   }
 };
+
+
+
 
 const transaction = async (req, res) => {
   try {
@@ -1255,17 +1239,18 @@ const bookingHistory = async (req, res) => {
   }
 };
 
-// Function to check and log bookings
 const checkBookings = async () => {
   try {
-    const currentDateTime = moment(new Date());
-    const newDateTime = currentDateTime.add(7, "minutes");
-    console.log("newDateTime", currentDateTime.format("hh:mm A"));
+    const currentDateTime = moment(); // Current date and time
+    const startTimeRange = {
+      $gte: moment(currentDateTime).format("hh:mm A"), // Start time should be on or after current time
+      $lte: moment(currentDateTime).add(30, "minutes").format("hh:mm A") // Start time should be within 30 minutes from current time
+    };
 
     const bookings = await Booking.aggregate([
       {
         $match: {
-          start_time: currentDateTime.format("hh:mm A"),
+          start_time: startTimeRange,
           date: moment(new Date()).format(DATE_FORMATE),
         },
       },
@@ -1289,31 +1274,32 @@ const checkBookings = async () => {
         $unwind: "$station_detail",
       },
     ]).exec();
+
     if (bookings.length > 0) {
       bookings.forEach((booking) => {
-        if (booking.status == "pending") {
+        if (booking.status === "pending") {
           sendNotification(
             booking?.user_id,
             "Booking alert",
             `You have a booking at ${booking?.station_detail?.station_name} from ${booking.start_time} to ${booking.end_time}.`
           );
         } else {
-          console.log(`We don't need push notification`);
+          console.log(`No notification needed for booking with status: ${booking.status}`);
         }
       });
     } else {
-      console.log("No bookings found.");
+      console.log("No upcoming bookings found for notifications.");
     }
   } catch (error) {
     console.error("Error checking bookings:", error.message);
   }
 };
 
-// Schedule the cron job to run every 2 seconds
-cron.schedule("*/10 * * * * *", () => {
-  console.log("Running cron job...");
+// Schedule the cron job to run every 14 minutes
+cron.schedule("*/14 * * * *", () => {
   checkBookings();
 });
+
 
 const stationQrCode = async (req, res) => {
   try {
@@ -1463,6 +1449,152 @@ const chargingStart = async (req, res) => {
   }
 };
 
+const chargingStartFromBooking = async (req, res) => {
+  try {
+    const { user_id, charger_id, connector_id, station_id, port_id, booking_id } = req.body;
+    if (!user_id || !charger_id || !connector_id || !station_id || !port_id || !booking_id) {
+      return res
+        .status(400)
+        .json({ status: false, message: "All fields are required." });
+    } else {
+      const check_charging_port_status = await Booking.findOne({
+        in_progress: true,
+        charger_id,
+        connector_id,
+      });
+
+      if (check_charging_port_status) {
+        return res.status(200).json({
+          status: false,
+          message: "Is the charger already in the process of charging",
+        });
+      } else {
+        const booking_check = await Booking.findOne({
+          _id: booking_id,
+        });
+        const environmentVariables = await EnvironmentVariable.findOne({});
+        if (!environmentVariables) {
+          return res.status(200).json({
+            status: false,
+            message:
+              "Please set the minimum amount variable and inform the admin.",
+          });
+        }
+
+        const minimumAmount = parseFloat(
+          environmentVariables.minimun_amount_for_charging
+        );
+        const findWallet = await Wallet.findOne({ user_id });
+
+        if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
+          return res.status(200).json({
+            status: false,
+            message: `Insufficient balance. Minimum amount required: ${minimumAmount}`,
+          });
+        }
+
+        // temportry start 
+        // await Booking.findOneAndUpdate(
+        //   { _id: booking_id },
+        //   {
+        //     $set: {
+        //       in_progress: true,
+        //       status: "booking",
+        //       charger_id,
+        //       connector_id
+        //     },
+        //   },
+        //   { new: true }
+        // );
+
+        //   return res.status(200).json({
+        //     status: false,
+        //     message:
+        //       "Please set the minimum amount variable and inform the admin.",
+        //   });
+
+        // temprarty start
+
+        const checkCurrentStatus = await axios.get(
+          `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
+        );
+
+
+
+        switch (checkCurrentStatus.data.status) {
+          case "Available":
+            // Proceed with charging
+            // Making Axios request
+
+            const response = await axios.get(
+              `http://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
+            );
+            if (response.status === 200) {
+
+
+              await Booking.findOneAndUpdate(
+                { _id: booking_id },
+                {
+                  $set: {
+                    in_progress: true,
+                    status: "booking",
+                    charger_id,
+                    connector_id,
+                    start_time: moment(new Date()).format('hh:mm A')
+                  },
+                },
+                { new: true }
+              );
+
+              res.status(200).json({
+                status: true,
+                message: "You have started charging.",
+              });
+            } else {
+              // Handle unsuccessful response
+              res.status(200).json({
+                status: false,
+                message: "Failed to fetch wallet data.",
+              });
+            }
+            break;
+          case "Preparing":
+            res.status(200).json({
+              status: false,
+              message: "Preparing for charging.",
+            });
+            break;
+          case "Charging":
+            res.status(200).json({
+              status: false,
+              message: "Charging in progress.",
+            });
+            break;
+          case "Finishing":
+            res.status(200).json({
+              status: false,
+              message: "Charging finished.",
+            });
+            break;
+          default:
+            res.status(200).json({
+              status: false,
+              message: "Unknown status.",
+              checkCurrentStatus
+            });
+            break;
+        }
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 const chargingStop = async (req, res) => {
   try {
     const { charger_id, connector_id } = req.body;
@@ -1494,16 +1626,11 @@ const chargingStop = async (req, res) => {
     let chargingStop;
     try {
       currentValues = await axios.get(
-        `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
+        `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
       );
-      res.status(200).json({
-        status: true,
-        message: "We have stopped your charging.",
-        // currentValues
-      });
-      // chargingStop = await axios.get(
-      //   `http://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${charger_id}&transactionID=${currentValues?.data.payload?.transactionId}`
-      // );
+      chargingStop = await axios.get(
+        `http://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${'charz-test-1'}&transactionID=${currentValues?.data.payload?.transactionId}`
+      );
     } catch (axiosError) {
       return res.status(200).json({
         status: false,
@@ -1511,59 +1638,163 @@ const chargingStop = async (req, res) => {
       });
     }
 
-    const findWallet = await Wallet.findOne({ user_id: check_charging_status?.user_id });
-    const end_time = moment(new Date());
-    const amount = hourConvertIntoMinute(
-      port_data?.unit_price,
-      check_charging_status?.start_time,
-      end_time.format('hh:mm A')
-    );
-    const wallet_balance = Number(findWallet?.amount) - amount;
 
-    await Wallet.updateOne(
-      { user_id: check_charging_status?.user_id },
-      { $set: { amount: wallet_balance } }
-    );
-
-    await Transaction.create({
-      user_id: check_charging_status?.user_id,
-      station_id: check_charging_status?.station_id,
-      amount: hourConvertIntoMinute(
+    if (check_charging_status?.status == 'booking') {
+      const end_time = moment(new Date());
+      const findWallet = await Wallet.findOne({ user_id: check_charging_status?.user_id });
+      let walletBalance = parseFloat(findWallet?.amount)
+      const advanceDebit = parseFloat(check_charging_status?.amount);  // Assuming advance debit amount
+      const sumAmount = advanceDebit + walletBalance
+      const currentAmountCharging = hourConvertIntoMinute(
         port_data?.unit_price,
         check_charging_status?.start_time,
         end_time.format('hh:mm A')
-      ),
-      credit_or_debit: "DB",
-    });
+      );
 
-    const updatedBooking = await Booking.findOneAndUpdate(
-      { charger_id, connector_id, in_progress: true },
-      {
-        $set: {
-          in_progress: false,
-          end_time: end_time.format('hh:mm A'),
-          transaction_id: currentValues?.data.payload?.transactionId,
-          amount: hourConvertIntoMinute(
-            port_data?.unit_price,
-            check_charging_status?.start_time,
-            end_time.format('hh:mm A')
-          ),
+
+
+      if (advanceDebit > currentAmountCharging) {
+        walletBalance = walletBalance + (advanceDebit - currentAmountCharging);
+        console.log(`The shopkeeper will return ${advanceDebit - currentAmountCharging} rupees to you.`);
+        await Wallet.updateOne(
+          { user_id: check_charging_status?.user_id },
+          { $set: { amount: walletBalance } }
+        );
+        await Transaction.create({
+          user_id: check_charging_status?.user_id,
+          station_id: check_charging_status?.station_id,
+          amount: advanceDebit - currentAmountCharging,
+          credit_or_debit: "CR",
+        });
+      } else if (advanceDebit < currentAmountCharging) {
+        walletBalance = walletBalance - (currentAmountCharging - advanceDebit);
+        await Wallet.updateOne(
+          { user_id: check_charging_status?.user_id },
+          { $set: { amount: walletBalance } }
+        );
+        await Transaction.findOneAndUpdate(
+          { transaction_id: check_charging_status?.transaction_id || '' },
+          {
+            $set: {
+              amount: currentAmountCharging - advanceDebit
+            },
+          },
+          { new: true }
+        );
+
+        console.log(`You need to pay an additional ${currentAmountCharging - advanceDebit} rupee(s) to the shopkeeper.`);
+      } else {
+        console.log("No refund or extra payment needed.");
+      }
+
+      const updatedBooking = await Booking.findOneAndUpdate(
+        { charger_id, connector_id, in_progress: true },
+        {
+          $set: {
+            in_progress: false,
+            status: "completed",
+            end_time: end_time.format('hh:mm A'),
+            transaction_id: currentValues?.data.payload?.transactionId || '',
+            amount: hourConvertIntoMinute(
+              port_data?.unit_price,
+              check_charging_status?.start_time,
+              end_time.format('hh:mm A')
+            ),
+          },
         },
-      },
-      { new: true }
-    );
+        { new: true }
+      );
 
-    if (updatedBooking) {
-      res.status(200).json({
-        status: true,
-        message: "We have stopped your charging.",
-      });
+      sendNotification(
+        check_charging_status?.user_id,
+        "Charging stopped",
+        `I have stopped your charging at ${port_data?.port_name}. Your total cost is ${hourConvertIntoMinute(
+          port_data?.unit_price,
+          check_charging_status?.start_time,
+          end_time.format('hh:mm A')
+        )} INR including GST.`
+      );
+
+      if (updatedBooking) {
+        res.status(200).json({
+          status: true,
+          message: "We have stopped your charging.",
+        });
+      } else {
+        res.status(200).json({
+          status: false,
+          message: "We can't update your status. There's an issue with this record.",
+        });
+      }
     } else {
-      res.status(200).json({
-        status: false,
-        message: "We can't update your status. There's an issue with this record.",
+      const findWallet = await Wallet.findOne({ user_id: check_charging_status?.user_id });
+      const end_time = moment(new Date());
+      const amount = hourConvertIntoMinute(
+        port_data?.unit_price,
+        check_charging_status?.start_time,
+        end_time.format('hh:mm A')
+      );
+
+      const wallet_balance = Number(findWallet?.amount) - amount;
+
+      await Wallet.updateOne(
+        { user_id: check_charging_status?.user_id },
+        { $set: { amount: wallet_balance } }
+      );
+
+      await Transaction.create({
+        user_id: check_charging_status?.user_id,
+        station_id: check_charging_status?.station_id,
+        amount: hourConvertIntoMinute(
+          port_data?.unit_price,
+          check_charging_status?.start_time,
+          end_time.format('hh:mm A')
+        ),
+        credit_or_debit: "DB",
       });
+
+      const updatedBooking = await Booking.findOneAndUpdate(
+        { charger_id, connector_id, in_progress: true },
+        {
+          $set: {
+            in_progress: false,
+            status: "completed",
+            end_time: end_time.format('hh:mm A'),
+            transaction_id: currentValues?.data.payload?.transactionId || '',
+            amount: hourConvertIntoMinute(
+              port_data?.unit_price,
+              check_charging_status?.start_time,
+              end_time.format('hh:mm A')
+            ),
+          },
+        },
+        { new: true }
+      );
+
+      sendNotification(
+        check_charging_status?.user_id,
+        "Charging stopped",
+        `I have stopped your charging at ${port_data?.port_name}. Your total cost is ${hourConvertIntoMinute(
+          port_data?.unit_price,
+          check_charging_status?.start_time,
+          end_time.format('hh:mm A')
+        )} INR including GST.`
+      );
+
+      if (updatedBooking) {
+        res.status(200).json({
+          status: true,
+          message: "We have stopped your charging.",
+        });
+      } else {
+        res.status(200).json({
+          status: false,
+          message: "We can't update your status. There's an issue with this record.",
+        });
+      }
     }
+
+
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -1807,6 +2038,7 @@ module.exports = {
   stationQrCode,
   chargingStart,
   chargingStop,
+  chargingStartFromBooking,
   chargingValues,
   fetchNotification,
   readNotification,

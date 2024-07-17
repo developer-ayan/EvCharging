@@ -21,7 +21,8 @@ const {
     readNotification,
     chargingStart,
     chargingStop,
-    chargingValues
+    chargingValues,
+    chargingStartFromBooking
  } = require('../controllers/logged-in');
 
 // Stations 
@@ -50,6 +51,7 @@ router.post("/read_notification", upload,  readNotification);
 // scan module
 router.post("/station_qr_code", upload,  stationQrCode);
 router.post("/port_charging_start", upload,  chargingStart);
+router.post("/port_charging_start_from_booking", upload,  chargingStartFromBooking);
 router.post("/port_charging_stop", upload,  chargingStop);
 router.post("/port_charging_values", upload,  chargingValues);
 

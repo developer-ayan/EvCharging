@@ -48,7 +48,7 @@ const transactionSchema = new mongoose.Schema({
 
 function generateTransactionId() {
     const staticPrefix = "TXN#";
-    const uuid = uuidv4().toUpperCase(); 
+    const uuid = uuidv4().toUpperCase();
     const transactionId = staticPrefix + uuid.substr(0, 7);
 
     return transactionId;
