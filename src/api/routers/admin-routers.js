@@ -36,7 +36,8 @@ const {
   subAdminRegister,
   subAdminList,
   editAdminRole,
-  createEnvironmentVariables
+  createEnvironmentVariables,
+  fetchEnvironmentVariables
 } = require('../controllers/admin');
 const headerMiddleware = require('../middlewares/headerMiddleware');
 const EnvironmentVariable = require('../models/admin/environment-variable');
@@ -154,6 +155,7 @@ router.post("/cancel_booking", upload_single, cancelBooking);
 
 // environment variables
 router.post("/environment_variable", upload_single, createEnvironmentVariables);
+router.post("/fetch_environment_variable", upload_single, fetchEnvironmentVariables);
 
 
 module.exports = router;

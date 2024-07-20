@@ -597,16 +597,16 @@ const portSlots = async (req, res) => {
 
 const portSlotReservation = async (req, res) => {
   try {
-    const { start_time, end_time, station_id, port_id } = req.body;
+    const { start_time, end_time, station_id, port_id, units } = req.body;
 
-    if (!start_time || !end_time || !station_id || !port_id) {
+    if (!start_time || !end_time || !station_id || !port_id || !units) {
       return res
         .status(200)
         .json({ status: false, message: "All fields are required." });
     }
 
     // Fetch booking entries and station information in parallel
-    const [fetchBookingEntries, response, port] = await Promise.all([
+    const [fetchBookingEntries, response, port, env_variable] = await Promise.all([
       Booking.find({
         station_id,
         port_id,
@@ -614,7 +614,9 @@ const portSlotReservation = async (req, res) => {
       }),
       Station.findOne({ _id: station_id }),
       Port.findOne({ _id: port_id }),
+      EnvironmentVariable.findOne({}),
     ]);
+
 
     if (response) {
       if (fetchBookingEntries.length > 0) {
@@ -670,11 +672,8 @@ const portSlotReservation = async (req, res) => {
             return false; // No booked slots found within the specified time range
           });
           const data = {
-            total_amount: hourConvertIntoMinute(
-              port?.unit_price || "0.00",
-              start_time,
-              end_time
-            ),
+            total_amount: totalCostWithGst(unitsCost(units, port?.unit_price), env_variable?.gst),
+            gst: env_variable?.gst
           };
 
           const statusMessage = isAnySlotBooked
@@ -732,11 +731,8 @@ const portSlotReservation = async (req, res) => {
           });
 
           const data = {
-            total_amount: hourConvertIntoMinute(
-              port?.unit_price,
-              start_time,
-              end_time
-            ),
+            total_amount: totalCostWithGst(unitsCost(units, port?.unit_price), env_variable?.gst),
+            gst: env_variable?.gst
           };
 
           const statusMessage = isAnySlotBooked
@@ -749,11 +745,8 @@ const portSlotReservation = async (req, res) => {
         }
       } else {
         const data = {
-          total_amount: hourConvertIntoMinute(
-            port.unit_price || "0.00",
-            start_time,
-            end_time
-          ),
+          total_amount: totalCostWithGst(unitsCost(units, port?.unit_price), env_variable?.gst),
+          gst: env_variable?.gst
         };
         res
           .status(200)
@@ -779,8 +772,9 @@ const bookingPort = async (req, res) => {
       end_time,
       transaction_id,
       account_type,
+      units
     } = req.body;
-    if (!station_id || !port_id || !amount || !start_time || !end_time) {
+    if (!station_id || !port_id || !amount || !start_time || !end_time || !units) {
       return res
         .status(200)
         .json({ status: false, message: "All fields are required." });
@@ -814,6 +808,7 @@ const bookingPort = async (req, res) => {
                   start_time,
                   end_time,
                   account_type,
+                  units,
                   status: "pending",
                 });
                 return res.status(200).json({
@@ -1161,6 +1156,7 @@ const transactionSuccessfully = async (req, res) => {
               start_time,
               end_time
             ),
+            units: booking_detail?.units || '0',
             transaction_id: booking_detail?.transaction_id,
             unit_allocated: slots?.length - 1,
           };
@@ -1221,6 +1217,25 @@ const bookingHistory = async (req, res) => {
         },
         {
           $unwind: "$station_detail",
+        },
+        {
+          $lookup: {
+            from: "ports",
+            let: { portId: "$port_id" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$_id", { $toObjectId: "$$portId" }],
+                  },
+                },
+              },
+            ],
+            as: "port_detail",
+          },
+        },
+        {
+          $unwind: "$port_detail",
         },
       ]);
 
@@ -1362,9 +1377,10 @@ const chargingStart = async (req, res) => {
         }
 
         const minimumAmount = parseFloat(
-          environmentVariables.minimun_amount_for_charging
+          environmentVariables.minimum_amount_for_charging
         );
         const findWallet = await Wallet.findOne({ user_id });
+        const findPort = await Port.findOne({ _id: port_id });
 
         if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
           return res.status(400).json({
@@ -1373,11 +1389,24 @@ const chargingStart = async (req, res) => {
           });
         }
 
-        const checkCurrentStatus = await axios.get(
-          `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
-        );
 
+        let checkCurrentStatus;
+        let currentValues;
+        try {
+          checkCurrentStatus = await axios.get(
+            `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
+          );
+          currentValues = await axios.get(
+            `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
+          );
+        } catch (axiosError) {
+          return res.status(200).json({
+            status: false,
+            message: "Error stopping the charging process.",
+          });
+        }
 
+        const meterValue = currentValues?.data?.payload?.meterValue;
 
         switch (checkCurrentStatus.data.status) {
           case "Available":
@@ -1397,7 +1426,9 @@ const chargingStart = async (req, res) => {
                 in_progress: true,
                 charger_id,
                 connector_id,
-                start_time: moment(new Date()).format('hh:mm A')
+                start_time: moment(new Date()).format('hh:mm A'),
+                initialWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
+                finalWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price).kWh,
               });
               // Success
               res.status(200).json({
@@ -1482,9 +1513,10 @@ const chargingStartFromBooking = async (req, res) => {
         }
 
         const minimumAmount = parseFloat(
-          environmentVariables.minimun_amount_for_charging
+          environmentVariables.minimum_amount_for_charging
         );
         const findWallet = await Wallet.findOne({ user_id });
+        const findPort = await Port.findOne({ _id: port_id });
 
         if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
           return res.status(200).json({
@@ -1515,11 +1547,23 @@ const chargingStartFromBooking = async (req, res) => {
 
         // temprarty start
 
-        const checkCurrentStatus = await axios.get(
-          `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
-        );
+        let checkCurrentStatus;
+        let currentValues;
+        try {
+          checkCurrentStatus = await axios.get(
+            `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
+          );
+          currentValues = await axios.get(
+            `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
+          );
+        } catch (axiosError) {
+          return res.status(200).json({
+            status: false,
+            message: "Error stopping the charging process.",
+          });
+        }
 
-
+        const meterValue = currentValues?.data?.payload?.meterValue;
 
         switch (checkCurrentStatus.data.status) {
           case "Available":
@@ -1540,7 +1584,9 @@ const chargingStartFromBooking = async (req, res) => {
                     status: "booking",
                     charger_id,
                     connector_id,
-                    start_time: moment(new Date()).format('hh:mm A')
+                    start_time: moment(new Date()).format('hh:mm A'),
+                    initialWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
+                    finalWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price).kWh,
                   },
                 },
                 { new: true }
@@ -1618,9 +1664,8 @@ const chargingStop = async (req, res) => {
       });
     }
 
-    const port_data = await Port.findOne({
-      _id: check_charging_status?.port_id,
-    });
+    const port_data = await Port.findOne({ _id: check_charging_status?.port_id });
+    const env_variable_data = await EnvironmentVariable.findOne({});
 
     let currentValues;
     let chargingStop;
@@ -1637,7 +1682,7 @@ const chargingStop = async (req, res) => {
         message: "Error stopping the charging process.",
       });
     }
-
+    const meterValue = currentValues?.data?.payload?.meterValue;
 
     if (check_charging_status?.status == 'booking') {
       const end_time = moment(new Date());
@@ -1645,11 +1690,7 @@ const chargingStop = async (req, res) => {
       let walletBalance = parseFloat(findWallet?.amount)
       const advanceDebit = parseFloat(check_charging_status?.amount);  // Assuming advance debit amount
       const sumAmount = advanceDebit + walletBalance
-      const currentAmountCharging = hourConvertIntoMinute(
-        port_data?.unit_price,
-        check_charging_status?.start_time,
-        end_time.format('hh:mm A')
-      );
+      const currentAmountCharging = totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst)
 
 
 
@@ -1664,6 +1705,7 @@ const chargingStop = async (req, res) => {
           user_id: check_charging_status?.user_id,
           station_id: check_charging_status?.station_id,
           amount: advanceDebit - currentAmountCharging,
+          transaction_reason: "Refund",
           credit_or_debit: "CR",
         });
       } else if (advanceDebit < currentAmountCharging) {
@@ -1695,11 +1737,9 @@ const chargingStop = async (req, res) => {
             status: "completed",
             end_time: end_time.format('hh:mm A'),
             transaction_id: currentValues?.data.payload?.transactionId || '',
-            amount: hourConvertIntoMinute(
-              port_data?.unit_price,
-              check_charging_status?.start_time,
-              end_time.format('hh:mm A')
-            ),
+            amount: totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst),
+            units: calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.kWh,
+            charging_date: moment(new Date()).format(DATE_FORMATE)
           },
         },
         { new: true }
@@ -1708,11 +1748,7 @@ const chargingStop = async (req, res) => {
       sendNotification(
         check_charging_status?.user_id,
         "Charging stopped",
-        `I have stopped your charging at ${port_data?.port_name}. Your total cost is ${hourConvertIntoMinute(
-          port_data?.unit_price,
-          check_charging_status?.start_time,
-          end_time.format('hh:mm A')
-        )} INR including GST.`
+        `I have stopped your charging at ${port_data?.port_name}. Your total cost is ${toFixedMethod(totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst))} INR including GST.`
       );
 
       if (updatedBooking) {
@@ -1729,11 +1765,7 @@ const chargingStop = async (req, res) => {
     } else {
       const findWallet = await Wallet.findOne({ user_id: check_charging_status?.user_id });
       const end_time = moment(new Date());
-      const amount = hourConvertIntoMinute(
-        port_data?.unit_price,
-        check_charging_status?.start_time,
-        end_time.format('hh:mm A')
-      );
+      const amount = totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst);
 
       const wallet_balance = Number(findWallet?.amount) - amount;
 
@@ -1745,11 +1777,7 @@ const chargingStop = async (req, res) => {
       await Transaction.create({
         user_id: check_charging_status?.user_id,
         station_id: check_charging_status?.station_id,
-        amount: hourConvertIntoMinute(
-          port_data?.unit_price,
-          check_charging_status?.start_time,
-          end_time.format('hh:mm A')
-        ),
+        amount: totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst),
         credit_or_debit: "DB",
       });
 
@@ -1761,11 +1789,9 @@ const chargingStop = async (req, res) => {
             status: "completed",
             end_time: end_time.format('hh:mm A'),
             transaction_id: currentValues?.data.payload?.transactionId || '',
-            amount: hourConvertIntoMinute(
-              port_data?.unit_price,
-              check_charging_status?.start_time,
-              end_time.format('hh:mm A')
-            ),
+            amount: totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst),
+            units: calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.kWh,
+            charging_date: moment(new Date()).format(DATE_FORMATE)
           },
         },
         { new: true }
@@ -1774,11 +1800,7 @@ const chargingStop = async (req, res) => {
       sendNotification(
         check_charging_status?.user_id,
         "Charging stopped",
-        `I have stopped your charging at ${port_data?.port_name}. Your total cost is ${hourConvertIntoMinute(
-          port_data?.unit_price,
-          check_charging_status?.start_time,
-          end_time.format('hh:mm A')
-        )} INR including GST.`
+        `I have stopped your charging at ${port_data?.port_name}. Your total cost is ${toFixedMethod(totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, port_data?.unit_price)?.amount, env_variable_data?.gst))} INR including GST.`
       );
 
       if (updatedBooking) {
@@ -1830,6 +1852,8 @@ const chargingValues = async (req, res) => {
         message: "Charging status not found",
       });
     } else {
+
+      const env_variable_data = await EnvironmentVariable.findOne({});
       // Find port details
       const find_port = await Port.findOne({
         _id: check_charging_status?.port_id,
@@ -1854,14 +1878,10 @@ const chargingValues = async (req, res) => {
         // Extract necessary values
         const units = meterValue?.[0]?.sampledValue?.[0] || {};
         const percentage = meterValue?.[0]?.sampledValue?.[3] || {};
-        const total_cost = hourConvertIntoMinute(
-          find_port.unit_price,
-          check_charging_status?.start_time,
-          moment(new Date()).format("hh:mm A")
-        );
+        const total_cost = toFixedMethod(totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, find_port?.unit_price)?.amount, env_variable_data?.gst));
 
         // Prepare data
-        const data = { units, percentage, total_cost };
+        const data = { units: totalCostWithGst(calculateAmount(check_charging_status?.initialWh, meterValue?.[0]?.sampledValue?.[0]?.value, find_port?.unit_price)?.kWh, env_variable_data?.gst), percentage, total_cost };
 
         // Respond with the data
         return res.status(200).json({
@@ -1990,6 +2010,26 @@ function generateSlots(startMoment, endMoment, isBooked) {
   return slots;
 }
 
+
+function totalCostWithGst(originalAmount, percentageAsString) {
+  // Convert percentage string to number
+  let percentage = parseFloat(percentageAsString);
+
+  // Check if conversion was successful
+  if (isNaN(percentage)) {
+    throw new Error("Invalid percentage value: " + percentageAsString);
+  }
+
+  // Calculate the amount to add
+  let percentageToAdd = (percentage / 100) * originalAmount;
+
+  // Calculate the new amount after adding the percentage
+  let newAmount = originalAmount + percentageToAdd;
+
+  // Return the new amount
+  return newAmount;
+}
+
 function hourConvertIntoMinute(per_min_unit, start_time, end_time) {
   // Convert start_time and end_time to moment objects
   const startTime = moment(start_time, "h:mm A");
@@ -2006,6 +2046,39 @@ function hourConvertIntoMinute(per_min_unit, start_time, end_time) {
 
   return cost;
 }
+
+const toFixedMethod = (number) => {
+  const num = isNaN(number) ? "0.00" : parseFloat(number).toFixed(2)
+  return num.toString()
+}
+
+function unitsCost(units, amount) {
+  const final = parseFloat(units) * parseFloat(amount)
+  return final;
+}
+
+
+function calculateAmount(initialWh, finalWh, unitPrice) {
+  // Calculate total consumed energy in Wh
+  const totalConsumedEnergy = finalWh - initialWh;
+
+  // Convert Wh to kWh
+  const kWh = totalConsumedEnergy / 1000;
+
+  // Calculate the amount
+  const amount = kWh * unitPrice;
+
+  return {
+    totalConsumedEnergy: parseFloat(toFixedMethod(totalConsumedEnergy)),
+    kWh: parseFloat(toFixedMethod(kWh)),
+    amount: parseFloat(toFixedMethod(amount)),
+  };
+}
+
+
+
+
+
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the Earth in kilometers

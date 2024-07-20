@@ -2,10 +2,15 @@ const mongoose = require("mongoose");
 const { created_at } = require("../../../utils/static-values");
 
 const environmentVariable = new mongoose.Schema({
-  minimun_amount_for_charging: {
+  minimum_amount_for_charging: {
     type: String,
-    required: true,
     trim: true,
+    default : 0
+  },
+  gst: {
+    type: String,
+    trim: true,
+    default : 0
   },
 });
 

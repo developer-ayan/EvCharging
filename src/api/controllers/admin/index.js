@@ -2060,40 +2060,20 @@ const pushNotification = async (req, res) => {
   }
 };
 
-const createEnvironmentVariables = async (req, res) => {
+const fetchEnvironmentVariables = async (req, res) => {
   try {
-    const { minimun_amount_for_charging } = req.body;
-
-    // Check for missing fields
-    if (!minimun_amount_for_charging) {
-      return res.status(200).json({
-        status: false,
-        message: "All fields are required",
+    const find = await EnvironmentVariable.find({}).sort({ _id: -1 }).exec();
+    if (find.length > 0) {
+      res.status(200).json({
+        status: true,
+        data: find?.[0],
+        message: "Environment variable fetch successfully.",
       });
     } else {
-      const find = await EnvironmentVariable.find({});
-
-      if (find.length > 0) {
-        return res.status(200).json({
-          status: false,
-          message: "Environment variables is already exist",
-        });
-      } else {
-        const faqsCreate = await EnvironmentVariable.create({
-          minimun_amount_for_charging,
-        });
-        if (faqsCreate) {
-          res.status(200).json({
-            status: true,
-            message: "Environment variables created successfully",
-          });
-        } else {
-          res.status(200).json({
-            status: false,
-            message: "Failed to create Environment variables",
-          });
-        }
-      }
+      res.status(200).json({
+        status: false,
+        message: "Environment variable not found!",
+      });
     }
   } catch (error) {
     res.status(200).json({
@@ -2102,6 +2082,69 @@ const createEnvironmentVariables = async (req, res) => {
     });
   }
 };
+
+const createEnvironmentVariables = async (req, res) => {
+  try {
+    const { minimum_amount_for_charging, gst, _id } = req.body;
+
+    // Check if environment variables already exist
+
+    if (_id) {
+      const existingVariables = await EnvironmentVariable.findById({ _id });
+
+      existingVariables.minimum_amount_for_charging = minimum_amount_for_charging || existingVariables.minimum_amount_for_charging;
+      existingVariables.gst = gst || existingVariables.gst;
+
+      const updated = await existingVariables.save();
+
+      if (updated) {
+        return res.status(200).json({
+          status: true,
+          message: "Environment variables updated successfully",
+        });
+      } else {
+        return res.status(500).json({
+          status: false,
+          message: "Failed to update environment variables",
+        });
+      }
+    } else {
+      const find = await EnvironmentVariable.find({});
+      if (find.length > 0) {
+        return res.status(200).json({
+          status: false,
+          message: "Environment variables is already exist",
+        });
+      } else {
+        // Create new environment variables
+        const faqsCreate = await EnvironmentVariable.create({
+          minimum_amount_for_charging,
+          gst
+        });
+
+        if (faqsCreate) {
+          return res.status(200).json({
+            status: true,
+            message: "Environment variables created successfully",
+          });
+        } else {
+          return res.status(500).json({
+            status: false,
+            message: "Failed to create environment variables",
+          });
+        }
+      }
+
+    }
+  } catch (error) {
+    console.error("Error in createEnvironmentVariables:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 
 module.exports = {
   login,
@@ -2158,4 +2201,5 @@ module.exports = {
   forgetPassword,
   editAdminRole,
   createEnvironmentVariables,
+  fetchEnvironmentVariables
 };
