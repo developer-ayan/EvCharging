@@ -51,10 +51,8 @@ const stationSchema = new mongoose.Schema({
 });
 
 function generateCustomSerialNumber() {
-    const staticPrefix = "#";
     const uuid = uuidv4().toUpperCase(); 
-    const serialNumber = staticPrefix + uuid.substr(0, 7) ;
-
+    const serialNumber = uuid.substr(0, 7) ;
     return serialNumber;
 }
 
