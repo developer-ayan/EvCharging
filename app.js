@@ -9,15 +9,15 @@ const app = express();
 const port = process.env.PORT || 3002;
 
 app.use(express.json());
-// app.use(cors({origin : 'http://localhost:3000'}));
+app.use(cors({origin : 'https://evcharging-be0a6.web.app'}));
 const allowedOrigins = ['http://localhost:3000', 'https://evcharging-be0a6.web.app'];
 
-app.use(cors({
-  origin: allowedOrigins,
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true,
-  optionsSuccessStatus: 204,
-}));
+// app.use(cors({
+//   origin: allowedOrigins,
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+//   credentials: true,
+//   optionsSuccessStatus: 204,
+// }));
 app.use('/uploads/station_images', express.static('uploads/station_images'));
 app.use('/uploads/users', express.static('uploads/users'));
 app.use('/uploads/port_images', express.static('uploads/port_images'));
