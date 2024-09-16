@@ -9,7 +9,7 @@ const app = express();
 const port = process.env.PORT || 3002;
 
 app.use(express.json());
-app.use(cors({origin : 'http://evcharging-be0a6.web.app'}));
+app.use(cors({origin : 'http://admin.charznet.in'}));
 const allowedOrigins = ['http://localhost:3000', 'https://evcharging-be0a6.web.app'];
 
 // app.use(cors({
