@@ -228,15 +228,11 @@ const login = async (req, res) => {
           const user_update = await Users.findOneAndUpdate(
             { _id: new ObjectId(user?._id) },
             { $set: { notification_token: notification_token } },
-            { new: true } // Return the modified document
+            { new: true }
           );
           const country_codes = await CountryCode.findOne({
             _id: country_code_id,
           });
-          console.log(
-            "country_codes?.country_code + phone",
-            country_codes?.country_code + phone
-          );
           SendSms(
             country_codes?.country_code + phone,
             `EvCharging Verification: Your one-time verification code is ${randomFourDigitNumber}. Please use this code to complete the verification process for your EvCharging account. Keep this code confidential and do not share it with anyone. If you did not initiate this verification, please disregard this message.`

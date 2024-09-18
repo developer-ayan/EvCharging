@@ -5,7 +5,7 @@ const SendSms = async (phone, message) => {
   try {
     const sentMessage = await client.messages.create({
       body: message,
-      // from: "EVCharging SMS", // Replace with your Twilio phone number
+      from: "+12564491597", // Replace with your Twilio phone number
       to: phone,
     });
     console.log(`Message SID: ${sentMessage.sid}`);
