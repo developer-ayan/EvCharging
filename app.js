@@ -32,6 +32,6 @@ app.use('/app/logged_in', loggedInRoutes);
 app.use('/admin', adminRoutes);
 app.use('/common', commonRoutes);
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
     console.log(`Server is running on port ${port}`);
 });
