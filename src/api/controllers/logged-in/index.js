@@ -1394,10 +1394,10 @@ const chargingStart = async (req, res) => {
         let currentValues;
         try {
           checkCurrentStatus = await axios.get(
-            `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
+            `https://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
           );
           currentValues = await axios.get(
-            `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
+            `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
           );
         } catch (axiosError) {
           return res.status(200).json({
@@ -1414,7 +1414,7 @@ const chargingStart = async (req, res) => {
             // Making Axios request
 
             const response = await axios.get(
-              `http://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
+              `https://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
             );
             if (response.status === 200) {
               await Booking.create({
@@ -1551,10 +1551,10 @@ const chargingStartFromBooking = async (req, res) => {
         let currentValues;
         try {
           checkCurrentStatus = await axios.get(
-            `http://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
+            `https://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
           );
           currentValues = await axios.get(
-            `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
+            `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
           );
         } catch (axiosError) {
           return res.status(200).json({
@@ -1571,7 +1571,7 @@ const chargingStartFromBooking = async (req, res) => {
             // Making Axios request
 
             const response = await axios.get(
-              `http://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
+              `https://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
             );
             if (response.status === 200) {
 
@@ -1671,10 +1671,10 @@ const chargingStop = async (req, res) => {
     let chargingStop;
     try {
       currentValues = await axios.get(
-        `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
+        `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
       );
       chargingStop = await axios.get(
-        `http://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${'charz-test-1'}&transactionID=${currentValues?.data.payload?.transactionId}`
+        `https://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${charger_id}&transactionID=${currentValues?.data.payload?.transactionId}`
       );
     } catch (axiosError) {
       return res.status(200).json({
@@ -1868,7 +1868,7 @@ const chargingValues = async (req, res) => {
 
       // Fetch charging values from external server
       const response = await axios.get(
-        `http://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=charz-test-1&connectorID=${connector_id}`
+        `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
       );
       if (response?.data?.payload) {
         console.log('response', response)
