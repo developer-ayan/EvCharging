@@ -1350,130 +1350,91 @@ const stationQrCode = async (req, res) => {
 const chargingStart = async (req, res) => {
   try {
     const { user_id, charger_id, connector_id, station_id, port_id } = req.body;
+
+    // Check for required fields
     if (!user_id || !charger_id || !connector_id || !station_id || !port_id) {
-      return res
-        .status(400)
-        .json({ status: false, message: "All fields are required." });
-    } else {
-      const check_charging_port_status = await Booking.findOne({
+      return res.status(200).json({ status: false, message: "All fields are required." });
+    }
+
+    // Check if the charger is already in use
+    const checkChargingPortStatus = await Booking.findOne({
+      in_progress: true,
+      charger_id,
+      connector_id,
+    });
+
+    if (checkChargingPortStatus) {
+      return res.status(200).json({
+        status: false,
+        message: "The charger is already in the process of charging.",
+      });
+    }
+
+    // Fetch environment variables
+    const environmentVariables = await EnvironmentVariable.findOne({});
+    if (!environmentVariables) {
+      return res.status(200).json({
+        status: false,
+        message: "Environment variables not set. Please inform the admin.",
+      });
+    }
+
+    const minimumAmount = parseFloat(environmentVariables.minimum_amount_for_charging);
+    const findWallet = await Wallet.findOne({ user_id });
+    const findPort = await Port.findOne({ _id: port_id });
+
+    // Check wallet balance
+    if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
+      return res.status(200).json({
+        status: false,
+        message: `Insufficient balance. Minimum amount required: ${minimumAmount}`,
+      });
+    }
+
+    // Fetch current charging values
+    let currentValues;
+    try {
+      currentValues = await axios.get(`https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`);
+    } catch (error) {
+      console.error(error);
+      return res.status(200).json({
+        status: false,
+        message: "Error fetching current charging values.",
+      });
+    }
+
+    const meterValue = currentValues?.data?.payload?.meterValue;
+
+    // Start charging
+    const response = await axios.get(`https://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`);
+    if (response.status === 200) {
+      await Booking.create({
+        user_id,
+        station_id,
+        port_id,
+        account_type: "WL",
+        status: "success",
         in_progress: true,
         charger_id,
         connector_id,
+        start_time: moment().format('hh:mm A'),
+        initialWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
+        finalWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
       });
 
-      if (check_charging_port_status) {
-        return res.status(200).json({
-          status: false,
-          message: "Is the charger already in the process of charging",
-        });
-      } else {
-        const environmentVariables = await EnvironmentVariable.findOne({});
-        if (!environmentVariables) {
-          return res.status(200).json({
-            status: false,
-            message:
-              "Please set the minimum amount variable and inform the admin.",
-          });
-        }
-
-        const minimumAmount = parseFloat(
-          environmentVariables.minimum_amount_for_charging
-        );
-        const findWallet = await Wallet.findOne({ user_id });
-        const findPort = await Port.findOne({ _id: port_id });
-
-        if (!findWallet || parseFloat(findWallet.amount) < minimumAmount) {
-          return res.status(400).json({
-            status: false,
-            message: `Insufficient balance. Minimum amount required: ${minimumAmount}`,
-          });
-        }
-
-
-        let checkCurrentStatus;
-        let currentValues;
-        try {
-          checkCurrentStatus = await axios.get(
-            `https://steve.scriptbees.com/ocpp-server/current-status-of-charger/?chargerID=${charger_id}&connectorID=${connector_id}`
-          );
-          currentValues = await axios.get(
-            `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
-          );
-        } catch (axiosError) {
-          return res.status(200).json({
-            status: false,
-            message: "Error stopping the charging process.",
-          });
-        }
-
-        const meterValue = currentValues?.data?.payload?.meterValue;
-
-        switch (checkCurrentStatus.data.status) {
-          case "Available":
-            // Proceed with charging
-            // Making Axios request
-
-            const response = await axios.get(
-              `https://steve.scriptbees.com/ocpp-server/remote-start/?chargerID=${charger_id}&connectorID=${connector_id}`
-            );
-            if (response.status === 200) {
-              await Booking.create({
-                user_id,
-                station_id,
-                port_id,
-                account_type: "WL",
-                status: "success",
-                in_progress: true,
-                charger_id,
-                connector_id,
-                start_time: moment(new Date()).format('hh:mm A'),
-                initialWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
-                finalWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price).kWh,
-              });
-              // Success
-              res.status(200).json({
-                status: true,
-                message: "You have started charging.",
-              });
-            } else {
-              // Handle unsuccessful response
-              res.status(200).json({
-                status: false,
-                message: "Failed to fetch wallet data.",
-              });
-            }
-            break;
-          case "Preparing":
-            res.status(200).json({
-              status: false,
-              message: "Preparing for charging.",
-            });
-            break;
-          case "Charging":
-            res.status(200).json({
-              status: false,
-              message: "Charging in progress.",
-            });
-            break;
-          case "Finishing":
-            res.status(200).json({
-              status: false,
-              message: "Charging finished.",
-            });
-            break;
-          default:
-            res.status(200).json({
-              status: false,
-              message: "Unknown status.",
-              checkCurrentStatus
-            });
-            break;
-        }
-      }
+      return res.status(200).json({
+        status: true,
+        message: "You have started charging.",
+      });
+    } else {
+      return res.status(200).json({
+        status: false,
+        message: "Failed to start the charging process.",
+      });
     }
   } catch (error) {
     console.error(error);
-    res.status(500).json({
+    return res.status(200).json({
       status: false,
       message: "Internal Server Error",
     });
