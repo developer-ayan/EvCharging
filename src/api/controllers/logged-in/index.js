@@ -1357,18 +1357,18 @@ const chargingStart = async (req, res) => {
     }
 
     // Check if the charger is already in use
-    const checkChargingPortStatus = await Booking.findOne({
-      in_progress: true,
-      charger_id,
-      connector_id,
-    });
+    // const checkChargingPortStatus = await Booking.findOne({
+    //   in_progress: true,
+    //   charger_id,
+    //   connector_id,
+    // });
 
-    if (checkChargingPortStatus) {
-      return res.status(200).json({
-        status: false,
-        message: "The charger is already in the process of charging.",
-      });
-    }
+    // if (checkChargingPortStatus) {
+    //   return res.status(200).json({
+    //     status: false,
+    //     message: "The charger is already in the process of charging.",
+    //   });
+    // }
 
     // Fetch environment variables
     const environmentVariables = await EnvironmentVariable.findOne({});
@@ -1418,8 +1418,8 @@ const chargingStart = async (req, res) => {
         charger_id,
         connector_id,
         start_time: moment().format('hh:mm A'),
-        initialWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
-        finalWh: calculateAmount(meterValue?.[0]?.sampledValue?.[0]?.value, findPort?.unit_price)?.kWh,
+        initialWh: meterValue?.[0]?.sampledValue?.[0]?.value,
+        finalWh: meterValue?.[0]?.sampledValue?.[0]?.value,
       });
 
       return res.status(200).json({
@@ -1632,10 +1632,10 @@ const chargingStop = async (req, res) => {
     let chargingStop;
     try {
       currentValues = await axios.get(
-        `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${'charz-test-1'}&connectorID=${connector_id}`
+        `https://steve.scriptbees.com/ocpp-server/charging-values/?chargerID=${charger_id}&connectorID=${connector_id}`
       );
       chargingStop = await axios.get(
-        `https://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${'charz-test-1'}&transactionID=${currentValues?.data.payload?.transactionId}`
+        `https://steve.scriptbees.com/ocpp-server/remote-stop/?chargerID=${charger_id}&transactionID=${currentValues?.data.payload?.transactionId}`
       );
     } catch (axiosError) {
       return res.status(200).json({
