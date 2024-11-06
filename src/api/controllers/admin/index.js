@@ -308,6 +308,7 @@ const createStationPort = async (req, res) => {
     const {
       station_id,
       port_type,
+      charging_power,
       unit_price,
       port_name,
       port_description,
@@ -317,6 +318,7 @@ const createStationPort = async (req, res) => {
     if (
       !station_id ||
       !port_type ||
+      !charging_power ||
       !unit_price ||
       !port_name ||
       !connector_id ||
@@ -334,6 +336,7 @@ const createStationPort = async (req, res) => {
         port_type,
         unit_price,
         port_name,
+        charging_power,
         port_description,
         charger_id,
         connector_id,
@@ -359,6 +362,7 @@ const editStationPort = async (req, res) => {
       port_type,
       unit_price,
       port_name,
+      charging_power,
       port_description,
       charger_id,
       connector_id,
@@ -381,6 +385,7 @@ const editStationPort = async (req, res) => {
       port.port_type = port_type || port.port_type;
       port.unit_price = unit_price || port.unit_price;
       port.port_name = port_name || port.port_name;
+      port.charging_power = charging_power || port.charging_power;
       port.port_description = port_description || port.port_description;
       port.charger_id = charger_id || port.charger_id;
       port.connector_id = connector_id || port.connector_id;
@@ -2092,7 +2097,9 @@ const createEnvironmentVariables = async (req, res) => {
     if (_id) {
       const existingVariables = await EnvironmentVariable.findById({ _id });
 
-      existingVariables.minimum_amount_for_charging = minimum_amount_for_charging || existingVariables.minimum_amount_for_charging;
+      existingVariables.minimum_amount_for_charging =
+        minimum_amount_for_charging ||
+        existingVariables.minimum_amount_for_charging;
       existingVariables.gst = gst || existingVariables.gst;
 
       const updated = await existingVariables.save();
@@ -2119,7 +2126,7 @@ const createEnvironmentVariables = async (req, res) => {
         // Create new environment variables
         const faqsCreate = await EnvironmentVariable.create({
           minimum_amount_for_charging,
-          gst
+          gst,
         });
 
         if (faqsCreate) {
@@ -2134,7 +2141,6 @@ const createEnvironmentVariables = async (req, res) => {
           });
         }
       }
-
     }
   } catch (error) {
     console.error("Error in createEnvironmentVariables:", error);
@@ -2144,7 +2150,6 @@ const createEnvironmentVariables = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   login,
@@ -2201,5 +2206,5 @@ module.exports = {
   forgetPassword,
   editAdminRole,
   createEnvironmentVariables,
-  fetchEnvironmentVariables
+  fetchEnvironmentVariables,
 };

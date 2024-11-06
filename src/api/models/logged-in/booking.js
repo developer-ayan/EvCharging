@@ -8,6 +8,7 @@ const bookingSchema = new mongoose.Schema({
   user_id: { type: String, trim: true },
   station_id: { type: String, trim: true },
   port_id: { type: String, trim: true },
+  iso_start_time: { type: String, trim: true },
   start_time: { type: String, trim: true },
   end_time: { type: String, trim: true },
   account_type: { type: String, trim: true, default: null },

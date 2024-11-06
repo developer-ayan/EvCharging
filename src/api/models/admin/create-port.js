@@ -22,6 +22,10 @@ const portSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  charging_power: {
+    type: Number,
+    required: true,
+  },
   port_description: {
     type: String,
     required: true,
