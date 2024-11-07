@@ -1366,6 +1366,7 @@ const stationQrCode = async (req, res) => {
 const chargingStart = async (req, res) => {
   try {
     const { user_id, charger_id, connector_id, station_id, port_id } = req.body;
+    console.log("req.body", req.body);
 
     // Check for required fields
     if (!user_id || !charger_id || !connector_id || !station_id || !port_id) {
@@ -1439,14 +1440,17 @@ const chargingStart = async (req, res) => {
         port_id,
         account_type: "WL",
         status: "success",
-        in_progress: true,
+        in_progress: "true",
+        charging_status: true,
         charger_id,
         connector_id,
         start_time: moment().format("hh:mm A"),
-        iso_start_time: moment().toISOString(),
+        iso_start_time: new Date().toISOString(),
         initialWh: meterValue?.[0]?.sampledValue?.[0]?.value,
         finalWh: meterValue?.[0]?.sampledValue?.[0]?.value,
       });
+
+      console.log("booking_id", booking._id);
 
       return res.status(200).json({
         status: true,
@@ -1653,7 +1657,7 @@ const chargingStartFromBooking = async (req, res) => {
 
 const chargingStop = async (req, res) => {
   try {
-    const { charger_id, connector_id } = req.body;
+    const { charger_id, connector_id, user_id } = req.body;
     if (!charger_id || !connector_id) {
       return res.status(200).json({
         status: false,
@@ -1664,7 +1668,8 @@ const chargingStop = async (req, res) => {
     const check_charging_status = await Booking.findOne({
       charger_id,
       connector_id,
-      in_progress: true,
+      user_id,
+      charging_status: true,
     });
 
     if (!check_charging_status) {
@@ -1699,19 +1704,17 @@ const chargingStop = async (req, res) => {
 
     if (check_charging_status?.status == "booking") {
       const end_time = moment(new Date());
+      const final_time = new Date().toISOString();
       const findWallet = await Wallet.findOne({
         user_id: check_charging_status?.user_id,
       });
       let walletBalance = parseFloat(findWallet?.amount);
       const advanceDebit = parseFloat(check_charging_status?.amount); // Assuming advance debit amount
-      const sumAmount = advanceDebit + walletBalance;
+      // const sumAmount = advanceDebit + walletBalance;
       const currentAmountCharging = totalCostWithGst(
         calculateAmount(
-          // check_charging_status?.initialWh,
-          // meterValue?.[0]?.sampledValue?.[0]?.value,
-          // port_data?.unit_price
-          check_charging_status?.start_time,
-          new Date(),
+          check_charging_status?.iso_start_time,
+          final_time,
           port_data?.charging_power,
           port_data?.unit_price
         )?.amount,
@@ -1762,31 +1765,25 @@ const chargingStop = async (req, res) => {
       }
 
       const updatedBooking = await Booking.findOneAndUpdate(
-        { charger_id, connector_id, in_progress: true },
+        { charger_id, connector_id, in_progress: "true" , user_id },
         {
           $set: {
-            in_progress: false,
+            in_progress: "false",
             status: "completed",
             end_time: end_time.format("hh:mm A"),
             transaction_id: currentValues?.data.payload?.transactionId || "",
             amount: totalCostWithGst(
               calculateAmount(
-                // check_charging_status?.initialWh,
-                // meterValue?.[0]?.sampledValue?.[0]?.value,
-                // port_data?.unit_price
-                check_charging_status?.start_time,
-                new Date(),
+                check_charging_status?.iso_start_time,
+                final_time,
                 port_data?.charging_power,
                 port_data?.unit_price
               )?.amount,
               env_variable_data?.gst
             ),
             units: calculateAmount(
-              // check_charging_status?.initialWh,
-              // meterValue?.[0]?.sampledValue?.[0]?.value,
-              // port_data?.unit_price
-              check_charging_status?.start_time,
-              new Date(),
+              check_charging_status?.iso_start_time,
+              final_time,
               port_data?.charging_power,
               port_data?.unit_price
             )?.kWh,
@@ -1804,11 +1801,8 @@ const chargingStop = async (req, res) => {
         }. Your total cost is ${toFixedMethod(
           totalCostWithGst(
             calculateAmount(
-              // check_charging_status?.initialWh,
-              // meterValue?.[0]?.sampledValue?.[0]?.value,
-              // port_data?.unit_price
-              check_charging_status?.start_time,
-              new Date(),
+              check_charging_status?.iso_start_time,
+              final_time,
               port_data?.charging_power,
               port_data?.unit_price
             )?.amount,
@@ -1817,22 +1811,21 @@ const chargingStop = async (req, res) => {
         )} INR including GST.`
       );
 
-      console.log(`I have stopped your charging at ${
+      console.log(
+        `I have stopped your charging at ${
           port_data?.port_name
         }. Your total cost is ${toFixedMethod(
           totalCostWithGst(
             calculateAmount(
-              // check_charging_status?.initialWh,
-              // meterValue?.[0]?.sampledValue?.[0]?.value,
-              // port_data?.unit_price
-              check_charging_status?.start_time,
-              new Date(),
+              check_charging_status?.iso_start_time,
+              final_time,
               port_data?.charging_power,
               port_data?.unit_price
             )?.amount,
             env_variable_data?.gst
           )
-        )} INR including GST.`)
+        )} INR including GST.`
+      );
 
       if (updatedBooking) {
         res.status(200).json({
@@ -1847,24 +1840,44 @@ const chargingStop = async (req, res) => {
         });
       }
     } else {
+      const final_time = new Date().toISOString();
       const findWallet = await Wallet.findOne({
         user_id: check_charging_status?.user_id,
       });
       const end_time = moment(new Date());
       const amount = totalCostWithGst(
         calculateAmount(
-          // check_charging_status?.initialWh,
-          // meterValue?.[0]?.sampledValue?.[0]?.value,
-          // port_data?.unit_price
-          check_charging_status?.start_time,
-          new Date(),
+          check_charging_status?.iso_start_time,
+          final_time,
           port_data?.charging_power,
           port_data?.unit_price
         )?.amount,
         env_variable_data?.gst
       );
 
+      console.log("chargingStop else values ==>", {
+        start_time: check_charging_status?.iso_start_time,
+        final_time,
+        charging_power: port_data?.charging_power,
+        unit_price: port_data?.unit_price,
+      });
+      // console.log(
+      //   "calculatedAmount",
+      //   calculateAmount(
+      //     check_charging_status?.iso_start_time,
+      //     final_time,
+      //     port_data?.charging_power,
+      //     port_data?.unit_price
+      //   )
+      // );
+
       const wallet_balance = Number(findWallet?.amount) - amount;
+      console.log(
+        "total amount with gst",
+        wallet_balance,
+        amount,
+        env_variable_data?.gst
+      );
 
       await Wallet.updateOne(
         { user_id: check_charging_status?.user_id },
@@ -1874,18 +1887,7 @@ const chargingStop = async (req, res) => {
       await Transaction.create({
         user_id: check_charging_status?.user_id,
         station_id: check_charging_status?.station_id,
-        amount: totalCostWithGst(
-          calculateAmount(
-            // check_charging_status?.initialWh,
-            // meterValue?.[0]?.sampledValue?.[0]?.value,
-            // port_data?.unit_price
-            check_charging_status?.start_time,
-            new Date(),
-            port_data?.charging_power,
-            port_data?.unit_price
-          )?.amount,
-          env_variable_data?.gst
-        ),
+        amount: amount,
         credit_or_debit: "DB",
       });
 
@@ -1895,6 +1897,7 @@ const chargingStop = async (req, res) => {
           $set: {
             in_progress: false,
             status: "completed",
+            charging_status:false,
             end_time: end_time.format("hh:mm A"),
             transaction_id: currentValues?.data.payload?.transactionId || "",
             amount: totalCostWithGst(
@@ -1906,11 +1909,8 @@ const chargingStop = async (req, res) => {
               env_variable_data?.gst
             ),
             units: calculateAmount(
-              // check_charging_status?.initialWh,
-              // meterValue?.[0]?.sampledValue?.[0]?.value,
-              // port_data?.unit_price
-              check_charging_status?.start_time,
-              new Date(),
+              check_charging_status?.iso_start_time,
+              final_time,
               port_data?.charging_power,
               port_data?.unit_price
             )?.kWh,
@@ -1928,11 +1928,8 @@ const chargingStop = async (req, res) => {
         }. Your total cost is ${toFixedMethod(
           totalCostWithGst(
             calculateAmount(
-              // check_charging_status?.initialWh,
-              // meterValue?.[0]?.sampledValue?.[0]?.value,
-              // port_data?.unit_price
-              check_charging_status?.start_time,
-              new Date(),
+              check_charging_status?.iso_start_time,
+              final_time,
               port_data?.charging_power,
               port_data?.unit_price
             )?.amount,
@@ -2227,17 +2224,29 @@ function unitsCost(units, amount) {
 // }
 
 function calculateAmount(startTime, endTime, chargingPower, unitPrice) {
-  const start = moment(startTime, "h:mm A");
-  const end = moment(endTime, "h:mm A");
+  // const start = moment(startTime);
+  // const end = moment(endTime);
 
-  const diffInSeconds = end.diff(start, "seconds");
-  const diffInHours = diffInSeconds / 3600;
-  const totalConsumedEnergy = diffInHours * chargingPower;
+  // const diffInSeconds = end.diff(start, "seconds");
+  // const diffInHours = diffInSeconds / 3600;
+  const initial_time = new Date(startTime);
+  const current_time = new Date(endTime);
+  const time_difference = Math.abs(initial_time - current_time);
+
+  const hours_difference = time_difference / (1000 * 60 * 60);
+  const totalConsumedEnergy = hours_difference * chargingPower;
   const amount = totalConsumedEnergy * unitPrice;
+
+  console.log("initial_time", initial_time);
+  console.log("current_time", current_time);
+  console.log("time_difference", time_difference);
+  console.log("hours_difference", hours_difference);
+  console.log("totalConsumedEnergy", totalConsumedEnergy);
+  console.log("amount", amount);
 
   return {
     totalConsumedEnergy: parseFloat(toFixedMethod(totalConsumedEnergy)),
-    kWh: parseFloat(toFixedMethod(totalConsumedEnergy)),
+    kWh: parseFloat(toFixedMethod(totalConsumedEnergy / 1000)),
     amount: parseFloat(toFixedMethod(amount)),
   };
 }

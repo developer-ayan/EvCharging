@@ -25,6 +25,7 @@ const bookingSchema = new mongoose.Schema({
   units: { type: String, trim: true, default: 0 },
   initialWh: { type: String, trim: true, default: 0 },
   finalWh: { type: String, trim: true, default: 0 },
+  charging_status: { type: Boolean, default: false },
 });
 
 function generateInvoiceNumber() {
