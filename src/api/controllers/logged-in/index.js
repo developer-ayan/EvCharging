@@ -595,11 +595,78 @@ const portSlots = async (req, res) => {
   }
 };
 
+const detectPaymentForBooking = async (
+  user_id,
+  station_id,
+  port_id,
+  amount,
+  start_time,
+  end_time,
+  units,
+  res
+) => {
+  try {
+    if (
+      !user_id ||
+      !station_id ||
+      !port_id ||
+      !amount ||
+      !start_time ||
+      !end_time ||
+      !units
+    ) {
+      return res
+        .status(200)
+        .json({ status: false, message: "All fields are required." });
+    } else {
+      const findWallet = await Wallet.findOne({ user_id });
+      if (findWallet) {
+        const wallet_balance = findWallet?.amount
+          ? Number(findWallet?.amount)
+          : 0.0;
+        if (wallet_balance >= Number(amount)) {
+          const check = await Booking.create({
+            user_id,
+            station_id,
+            port_id,
+            amount,
+            start_time,
+            end_time,
+            account_type: "WL",
+            units,
+            status: "pending",
+          });
+
+          console.log('check', check._id)
+        } else {
+          return res.status(200).json({
+            status: false,
+            message: `You have insufficient balance in your wallet. Please add balance to your wallet and try again.`,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(200)
+      .json({ status: false, message: "Internal Server Error" });
+  }
+};
+
 const portSlotReservation = async (req, res) => {
   try {
-    const { start_time, end_time, station_id, port_id, units } = req.body;
+    const { start_time, end_time, station_id, port_id, units, user_id } =
+      req.body;
 
-    if (!start_time || !end_time || !station_id || !port_id || !units) {
+    if (
+      !start_time ||
+      !end_time ||
+      !station_id ||
+      !port_id ||
+      !units ||
+      !user_id
+    ) {
       return res
         .status(200)
         .json({ status: false, message: "All fields are required." });
@@ -683,6 +750,19 @@ const portSlotReservation = async (req, res) => {
             ? "There are booked slots between the specified start and end times"
             : "Reservation successfully.";
 
+          if (!isAnySlotBooked) {
+            await detectPaymentForBooking(
+              user_id,
+              station_id,
+              port_id,
+              data.total_amount,
+              start_time,
+              end_time,
+              units,
+              res
+            );
+          }
+
           res
             .status(200)
             .json({ status: !isAnySlotBooked, data, message: statusMessage });
@@ -745,6 +825,19 @@ const portSlotReservation = async (req, res) => {
             ? "There are booked slots between the specified start and end times"
             : "Reservation successfully.";
 
+          if (!isAnySlotBooked) {
+            await detectPaymentForBooking(
+              user_id,
+              station_id,
+              port_id,
+              data.total_amount,
+              start_time,
+              end_time,
+              units,
+              res
+            );
+          }
+
           res
             .status(200)
             .json({ status: !isAnySlotBooked, data, message: statusMessage });
@@ -757,6 +850,18 @@ const portSlotReservation = async (req, res) => {
           ),
           gst: env_variable?.gst,
         };
+
+        await detectPaymentForBooking(
+          user_id,
+          station_id,
+          port_id,
+          data.total_amount,
+          start_time,
+          end_time,
+          units,
+          res
+        );
+
         res
           .status(200)
           .json({ status: true, data, message: "Reservation successfully." });
@@ -802,47 +907,64 @@ const bookingPort = async (req, res) => {
             ? Number(findWallet?.amount)
             : 0.0;
           if (wallet_balance >= Number(amount)) {
-            const wallet_balance = Number(findWallet?.amount) - Number(amount);
-            const updatedWallet = await Wallet.updateOne(
-              { user_id },
-              { $set: { amount: wallet_balance } }
-            );
-            if (updatedWallet) {
-              const transaction = await Transaction.create({
-                user_id,
-                station_id,
-                amount,
-                credit_or_debit: "DB",
-              });
-              if (transaction) {
-                const bookingSubmit = await Booking.create({
-                  user_id,
-                  station_id,
-                  transaction_id: transaction?.transaction_id,
-                  port_id,
-                  amount,
-                  start_time,
-                  end_time,
-                  account_type,
-                  units,
-                  status: "pending",
-                });
-                return res.status(200).json({
-                  status: true,
-                  data: bookingSubmit,
-                  message: "Booking submit successfully.",
-                });
-              } else {
-                return res.status(200).json({
-                  status: false,
-                  message: "Something issue from transaction",
-                });
-              }
-            } else {
-              return res
-                .status(200)
-                .json({ status: false, message: "Wallet transaction issue!" });
-            }
+            const bookingSubmit = await Booking.create({
+              user_id,
+              station_id,
+              port_id,
+              amount,
+              start_time,
+              end_time,
+              account_type,
+              units,
+              status: "pending",
+            });
+            return res.status(200).json({
+              status: true,
+              data: bookingSubmit,
+              message: "Booking submit successfully.",
+            });
+
+            // const wallet_balance = Number(findWallet?.amount) - Number(amount);
+            // const updatedWallet = await Wallet.updateOne(
+            //   { user_id },
+            //   { $set: { amount: wallet_balance } }
+            // );
+            // if (updatedWallet) {
+            //   const transaction = await Transaction.create({
+            //     user_id,
+            //     station_id,
+            //     amount,
+            //     credit_or_debit: "DB",
+            //   });
+            //   if (transaction) {
+            //     const bookingSubmit = await Booking.create({
+            //       user_id,
+            //       station_id,
+            //       transaction_id: transaction?.transaction_id,
+            //       port_id,
+            //       amount,
+            //       start_time,
+            //       end_time,
+            //       account_type,
+            //       units,
+            //       status: "pending",
+            //     });
+            //     return res.status(200).json({
+            //       status: true,
+            //       data: bookingSubmit,
+            //       message: "Booking submit successfully.",
+            //     });
+            //   } else {
+            //     return res.status(200).json({
+            //       status: false,
+            //       message: "Something issue from transaction",
+            //     });
+            //   }
+            // } else {
+            //   return res
+            //     .status(200)
+            //     .json({ status: false, message: "Wallet transaction issue!" });
+            // }
           } else {
             return res.status(200).json({
               status: false,
@@ -1658,10 +1780,10 @@ const chargingStartFromBooking = async (req, res) => {
 const chargingStop = async (req, res) => {
   try {
     const { charger_id, connector_id, user_id } = req.body;
-    if (!charger_id || !connector_id) {
+    if (!charger_id || !connector_id || !user_id) {
       return res.status(200).json({
         status: false,
-        message: "charger_id and connector_id are required.",
+        message: "charger_id, connector_id and user_id are required.",
       });
     }
 
@@ -1765,7 +1887,7 @@ const chargingStop = async (req, res) => {
       }
 
       const updatedBooking = await Booking.findOneAndUpdate(
-        { charger_id, connector_id, in_progress: "true" , user_id },
+        { charger_id, connector_id, in_progress: "true", user_id },
         {
           $set: {
             in_progress: "false",
@@ -1892,12 +2014,17 @@ const chargingStop = async (req, res) => {
       });
 
       const updatedBooking = await Booking.findOneAndUpdate(
-        { charger_id, connector_id, in_progress: true },
+        {
+          charger_id,
+          connector_id,
+          in_progress: "true",
+          charging_status: true,
+        },
         {
           $set: {
-            in_progress: false,
+            in_progress: "false",
             status: "completed",
-            charging_status:false,
+            charging_status: false,
             end_time: end_time.format("hh:mm A"),
             transaction_id: currentValues?.data.payload?.transactionId || "",
             amount: totalCostWithGst(
