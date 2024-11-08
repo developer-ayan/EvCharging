@@ -635,9 +635,11 @@ const detectPaymentForBooking = async (
             account_type: "WL",
             units,
             status: "pending",
+            in_progress: "false",
+            charging_status: false,
           });
 
-          console.log("check", check._id);
+          console.log('check', check._id)
         } else {
           return res.status(200).json({
             status: false,
@@ -917,6 +919,8 @@ const bookingPort = async (req, res) => {
               account_type,
               units,
               status: "pending",
+              in_progress: "false",
+              charging_status: false,
             });
             return res.status(200).json({
               status: true,
@@ -1621,7 +1625,8 @@ const chargingStartFromBooking = async (req, res) => {
         .json({ status: false, message: "All fields are required." });
     } else {
       const check_charging_port_status = await Booking.findOne({
-        in_progress: true,
+        in_progress: "true",
+        charging_status: true,
         charger_id,
         connector_id,
       });
@@ -1710,7 +1715,7 @@ const chargingStartFromBooking = async (req, res) => {
                 { _id: booking_id },
                 {
                   $set: {
-                    in_progress: true,
+                    in_progress: "true",
                     status: "booking",
                     charger_id,
                     connector_id,
@@ -1791,6 +1796,7 @@ const chargingStop = async (req, res) => {
       charger_id,
       connector_id,
       user_id,
+      in_progress: "true",
       charging_status: true,
     });
 
@@ -1887,10 +1893,11 @@ const chargingStop = async (req, res) => {
       }
 
       const updatedBooking = await Booking.findOneAndUpdate(
-        { charger_id, connector_id, in_progress: "true", user_id },
+        { charger_id, connector_id, in_progress: "true", user_id, charging_status: true },
         {
           $set: {
             in_progress: "false",
+            charging_status: false,
             status: "completed",
             end_time: end_time.format("hh:mm A"),
             transaction_id: currentValues?.data.payload?.transactionId || "",
@@ -2023,8 +2030,8 @@ const chargingStop = async (req, res) => {
         {
           $set: {
             in_progress: "false",
-            status: "completed",
             charging_status: false,
+            status: "completed",
             end_time: end_time.format("hh:mm A"),
             transaction_id: currentValues?.data.payload?.transactionId || "",
             amount: toFixedMethod(
@@ -2106,7 +2113,8 @@ const chargingValues = async (req, res) => {
     const check_charging_status = await Booking.findOne({
       charger_id,
       connector_id,
-      in_progress: true,
+      in_progress: "true",
+      charging_status: true,
     });
 
     if (!check_charging_status) {

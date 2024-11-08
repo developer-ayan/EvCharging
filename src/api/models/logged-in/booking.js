@@ -15,7 +15,7 @@ const bookingSchema = new mongoose.Schema({
   amount: { type: String, trim: true, default: 0 },
   transaction_id: { type: String, trim: true, default: null },
   status: { type: String, trim: true, default: "pending" },
-  in_progress: { type: String, trim: true, default: false },
+  in_progress: { type: String, trim: true, default: "false" },
   charger_id: { type: String, trim: true, default: false },
   connector_id: { type: String, trim: true, default: false },
   date: { type: String, trim: true, default: moment(new Date()).format(DATE_FORMATE) },
