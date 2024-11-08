@@ -637,7 +637,7 @@ const detectPaymentForBooking = async (
             status: "pending",
           });
 
-          console.log('check', check._id)
+          console.log("check", check._id);
         } else {
           return res.status(200).json({
             status: false,
@@ -2027,13 +2027,16 @@ const chargingStop = async (req, res) => {
             charging_status: false,
             end_time: end_time.format("hh:mm A"),
             transaction_id: currentValues?.data.payload?.transactionId || "",
-            amount: totalCostWithGst(
-              calculateAmount(
-                check_charging_status?.initialWh,
-                meterValue?.[0]?.sampledValue?.[0]?.value,
-                port_data?.unit_price
-              )?.amount,
-              env_variable_data?.gst
+            amount: toFixedMethod(
+              totalCostWithGst(
+                calculateAmount(
+                  check_charging_status?.iso_start_time,
+                  final_time,
+                  port_data?.charging_power,
+                  port_data?.unit_price
+                )?.amount,
+                env_variable_data?.gst
+              )
             ),
             units: calculateAmount(
               check_charging_status?.iso_start_time,
