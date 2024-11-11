@@ -639,7 +639,7 @@ const detectPaymentForBooking = async (
             charging_status: false,
           });
 
-          console.log('check', check._id)
+          console.log("check", check._id);
         } else {
           return res.status(200).json({
             status: false,
@@ -1378,6 +1378,48 @@ const bookingHistory = async (req, res) => {
         {
           $unwind: "$port_detail",
         },
+        {
+          // Step 1: Convert the 12-hour time format into a 24-hour format before processing it
+          $addFields: {
+            created_at_24h: {
+              $cond: {
+                if: { $regexMatch: { input: "$created_at", regex: /AM$/i } },
+                then: {
+                  $concat: [
+                    { $substr: ["$created_at", 0, 11] }, // take the first part of the string (date + time)
+                    { $substr: ["$created_at", 11, 5] }, // append time part after removing AM
+                  ],
+                },
+                else: {
+                  $concat: [
+                    { $substr: ["$created_at", 0, 11] }, // take the first part of the string (date + time)
+                    { $substr: ["$created_at", 11, 5] }, // append time part after removing PM
+                  ],
+                },
+              },
+            },
+          },
+        },
+        {
+          $addFields: {
+            createdAtDate: {
+              $dateFromString: {
+                dateString: "$created_at_24h",
+                format: "%d/%m/%Y %H:%M", // Updated to 24-hour format
+              },
+            },
+          },
+        },
+        {
+          $sort: {
+            createdAtDate: -1, // Sort by the createdAtDate field in descending order
+          },
+        },
+        {
+          $project: {
+            createdAtDate: 0, // remove the intermediate createdAtDate field
+          },
+        },
       ]);
 
       res.status(200).json({
@@ -1893,7 +1935,13 @@ const chargingStop = async (req, res) => {
       }
 
       const updatedBooking = await Booking.findOneAndUpdate(
-        { charger_id, connector_id, in_progress: "true", user_id, charging_status: true },
+        {
+          charger_id,
+          connector_id,
+          in_progress: "true",
+          user_id,
+          charging_status: true,
+        },
         {
           $set: {
             in_progress: "false",
