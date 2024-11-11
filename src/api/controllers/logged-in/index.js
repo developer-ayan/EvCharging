@@ -1626,6 +1626,7 @@ const chargingStart = async (req, res) => {
           ...booking.toObject(),
           charging_power: findPort.charging_power,
           unit_price: Number(findPort.unit_price),
+          gst: environmentVariables?.gst || 0
         },
         message: "You have started charging.",
       });
